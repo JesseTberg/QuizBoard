@@ -49,17 +49,15 @@ export default function BoardView({ gameState }: BoardViewProps) {
                     <button
                       key={question.id}
                       onClick={() => selectQuestion(category.id, question.id)}
-                      disabled={question.isAnswered || gameState.status !== 'playing'}
+                      disabled={gameState.status !== 'playing'}
                       className={`
                         question-card
                         ${question.isAnswered ? 'question-card-answered' : 'question-card-active'}
                       `}
                     >
-                      {!question.isAnswered && (
-                        <span className="question-value">
-                          ${question.points}
-                        </span>
-                      )}
+                      <span className={`question-value ${question.isAnswered ? 'opacity-40 line-through' : ''}`}>
+                        ${question.points}
+                      </span>
                     </button>
                   ))}
                 </div>

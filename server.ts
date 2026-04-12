@@ -30,7 +30,8 @@ io.on('connection', (socket) => {
       status: 'lobby',
       currentQuestion: null,
       buzzedPlayerId: null,
-      buzzedAt: null
+      buzzedAt: null,
+      buzzedHistory: [] // Track who buzzed for the current question
     };
     games.set(gameId, game);
     socket.join(gameId);
@@ -69,6 +70,7 @@ io.on('connection', (socket) => {
       game.currentQuestion = { categoryId, questionId };
       game.buzzedPlayerId = null;
       game.buzzedAt = null;
+      game.buzzedHistory = []; // Reset history for new question
       io.to(gameId).emit('game-state', game);
     }
   });
@@ -76,9 +78,15 @@ io.on('connection', (socket) => {
   socket.on('buzz', ({ gameId }) => {
     const game = games.get(gameId);
     if (game && game.status === 'question' && !game.buzzedPlayerId) {
+      // Check if player already buzzed for this question
+      if (game.buzzedHistory.includes(socket.id)) {
+        return;
+      }
+      
       game.status = 'buzzed';
       game.buzzedPlayerId = socket.id;
       game.buzzedAt = Date.now();
+      game.buzzedHistory.push(socket.id);
       io.to(gameId).emit('game-state', game);
     }
   });
@@ -100,11 +108,42 @@ io.on('connection', (socket) => {
         game.status = 'playing';
         game.currentQuestion = null;
         game.buzzedPlayerId = null;
+        game.buzzedHistory = [];
       } else {
         game.status = 'question';
         game.buzzedPlayerId = null;
       }
       io.to(gameId).emit('game-state', game);
+    }
+  });
+
+  socket.on('skip-question', ({ gameId }) => {
+    const game = games.get(gameId);
+    if (game && game.currentQuestion) {
+      const { categoryId, questionId } = game.currentQuestion;
+      const category = game.board.categories.find(c => c.id === categoryId);
+      const question = category.questions.find(q => q.id === questionId);
+      
+      if (question) {
+        question.isAnswered = true;
+      }
+      
+      game.status = 'playing';
+      game.currentQuestion = null;
+      game.buzzedPlayerId = null;
+      game.buzzedHistory = [];
+      io.to(gameId).emit('game-state', game);
+    }
+  });
+
+  socket.on('adjust-score', ({ gameId, playerId, amount }) => {
+    const game = games.get(gameId);
+    if (game) {
+      const player = game.players.find(p => p.id === playerId);
+      if (player) {
+        player.score += amount;
+        io.to(gameId).emit('game-state', game);
+      }
     }
   });
 

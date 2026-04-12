@@ -1,16 +1,19 @@
 import { GameState } from '../types';
 import socket from '../lib/socket';
 import { QRCodeSVG } from 'qrcode.react';
-import { Check, X, RefreshCw, Play, Users, Monitor, Zap } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Check, X, RefreshCw, Play, Users, Monitor, Zap, QrCode, Plus, Minus, ChevronLeft } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface HostViewProps {
   gameState: GameState;
 }
 
 export default function HostView({ gameState }: HostViewProps) {
+  const [showHostQR, setShowHostQR] = useState(false);
   const joinUrl = `${window.location.origin}?gameId=${gameState.id}&role=player`;
   const boardUrl = `${window.location.origin}?gameId=${gameState.id}&role=board`;
+  const hostUrl = `${window.location.origin}?gameId=${gameState.id}&role=host`;
 
   const startGame = () => {
     socket.emit('start-game', gameState.id);
@@ -18,6 +21,18 @@ export default function HostView({ gameState }: HostViewProps) {
 
   const handleAnswer = (correct: boolean) => {
     socket.emit('answer-result', { gameId: gameState.id, correct });
+  };
+
+  const skipQuestion = () => {
+    socket.emit('skip-question', { gameId: gameState.id });
+  };
+
+  const adjustScore = (playerId: string, amount: number) => {
+    socket.emit('adjust-score', { gameId: gameState.id, playerId, amount });
+  };
+
+  const selectQuestion = (categoryId: number, questionId: number) => {
+    socket.emit('select-question', { gameId: gameState.id, categoryId, questionId });
   };
 
   const buzzedPlayer = gameState.players.find(p => p.id === gameState.buzzedPlayerId);
@@ -34,14 +49,32 @@ export default function HostView({ gameState }: HostViewProps) {
             </h2>
             <div className="space-y-3">
               {gameState.players.sort((a,b) => b.score - a.score).map((player, idx) => (
-                <div key={player.id} className="host-sidebar-item">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[10px] font-bold text-brand-muted">#{idx + 1}</span>
-                    <span className="font-bold text-sm">{player.name}</span>
+                <div key={player.id} className="host-sidebar-item flex-col items-stretch gap-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-bold text-brand-muted">#{idx + 1}</span>
+                      <span className="font-bold text-sm">{player.name}</span>
+                    </div>
+                    <span className={`font-black text-sm ${player.score >= 0 ? 'text-brand-accent' : 'text-red-500'}`}>
+                      ${player.score}
+                    </span>
                   </div>
-                  <span className={`font-black text-sm ${player.score >= 0 ? 'text-brand-accent' : 'text-red-500'}`}>
-                    ${player.score}
-                  </span>
+                  <div className="flex items-center gap-1 justify-end">
+                    <button 
+                      onClick={() => adjustScore(player.id, -100)}
+                      className="p-1 hover:bg-white/10 rounded text-red-500"
+                      title="Decrease Score"
+                    >
+                      <Minus size={12} />
+                    </button>
+                    <button 
+                      onClick={() => adjustScore(player.id, 100)}
+                      className="p-1 hover:bg-white/10 rounded text-brand-accent"
+                      title="Increase Score"
+                    >
+                      <Plus size={12} />
+                    </button>
+                  </div>
                 </div>
               ))}
               {gameState.players.length === 0 && (
@@ -56,13 +89,50 @@ export default function HostView({ gameState }: HostViewProps) {
           </div>
 
           <div className="card-surface p-6 text-center space-y-6">
-            <div className="space-y-1">
-              <h2 className="text-xs font-black uppercase tracking-[0.2em] text-brand-muted">Join Session</h2>
-              <p className="text-[10px] text-slate-500 font-mono break-all">{gameState.id}</p>
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-left">
+                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-brand-muted">Session</h2>
+                <p className="text-[10px] text-slate-500 font-mono">{gameState.id}</p>
+              </div>
+              <button 
+                onClick={() => setShowHostQR(!showHostQR)}
+                className={`p-2 rounded-lg transition-colors ${showHostQR ? 'bg-brand-primary text-white' : 'bg-white/5 text-brand-muted hover:bg-white/10'}`}
+                title="Show Host QR"
+              >
+                <QrCode size={16} />
+              </button>
             </div>
-            <div className="qr-container">
-              <QRCodeSVG value={joinUrl} size={140} />
-            </div>
+
+            <AnimatePresence mode="wait">
+              {showHostQR ? (
+                <motion.div 
+                  key="host-qr"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="space-y-4"
+                >
+                  <div className="qr-container bg-brand-accent/10 p-2 rounded-xl border border-brand-accent/20">
+                    <QRCodeSVG value={hostUrl} size={140} />
+                  </div>
+                  <p className="text-[10px] text-brand-accent font-bold uppercase tracking-widest">Host View QR</p>
+                </motion.div>
+              ) : (
+                <motion.div 
+                  key="join-qr"
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  className="space-y-4"
+                >
+                  <div className="qr-container">
+                    <QRCodeSVG value={joinUrl} size={140} />
+                  </div>
+                  <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest">Player Join QR</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <div className="space-y-2">
               <a 
                 href={boardUrl} 
@@ -105,13 +175,36 @@ export default function HostView({ gameState }: HostViewProps) {
               <motion.div 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                className="text-center-spacing"
+                className="w-full h-full flex flex-col"
               >
-                <div className="w-20 h-20 bg-brand-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Monitor className="text-brand-primary" size={40} />
+                <div className="mb-6 text-center">
+                  <h1 className="text-2xl font-black italic tracking-tighter text-brand-primary">SELECT A QUESTION</h1>
+                  <p className="text-brand-muted text-xs uppercase tracking-widest">Click a value to force select (Host Override)</p>
                 </div>
-                <h1 className="text-4xl font-black italic tracking-tighter">SELECTING QUESTION</h1>
-                <p className="text-brand-muted max-w-md mx-auto">The board is active. Use the main screen to pick a category and point value.</p>
+                
+                <div className="grid grid-cols-5 gap-4 flex-1 overflow-auto p-2">
+                  {gameState.board.categories.map(category => (
+                    <div key={category.id} className="space-y-2">
+                      <div className="bg-brand-surface p-2 rounded text-center border border-brand-primary/20">
+                        <p className="text-[10px] font-black uppercase truncate text-brand-primary">{category.title}</p>
+                      </div>
+                      {category.questions.map(question => (
+                        <button
+                          key={question.id}
+                          onClick={() => selectQuestion(category.id, question.id)}
+                          className={`
+                            w-full py-3 rounded font-black text-sm transition-all border
+                            ${question.isAnswered 
+                              ? 'bg-brand-surface/50 text-brand-muted border-transparent' 
+                              : 'bg-brand-primary/10 text-brand-primary border-brand-primary/30 hover:bg-brand-primary hover:text-white'}
+                          `}
+                        >
+                          ${question.points}
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
               </motion.div>
             )}
 
@@ -121,15 +214,27 @@ export default function HostView({ gameState }: HostViewProps) {
                 animate={{ opacity: 1, scale: 1 }}
                 className="host-question-display"
               >
-                <div className="space-y-2">
-                  <span className="px-4 py-1 bg-brand-primary/20 text-brand-primary rounded-full text-xs font-black uppercase tracking-widest">
-                    {gameState.status === 'question' ? 'Question Active' : 'Player Buzzed'}
-                  </span>
-                  <h1 className="host-question-text">
-                    {gameState.board.categories.find(c => c.id === gameState.currentQuestion?.categoryId)
-                      ?.questions.find(q => q.id === gameState.currentQuestion?.questionId)?.text}
-                  </h1>
+                <div className="w-full flex justify-between items-start mb-4">
+                  <div className="space-y-1">
+                    <span className="px-4 py-1 bg-brand-primary/20 text-brand-primary rounded-full text-[10px] font-black uppercase tracking-widest">
+                      {gameState.status === 'question' ? 'Question Active' : 'Player Buzzed'}
+                    </span>
+                    <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest">
+                      {gameState.board.categories.find(c => c.id === gameState.currentQuestion?.categoryId)?.title} • ${gameState.board.categories.find(c => c.id === gameState.currentQuestion?.categoryId)?.questions.find(q => q.id === gameState.currentQuestion?.questionId)?.points}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={skipQuestion}
+                    className="flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-red-500 hover:text-red-400 transition-colors"
+                  >
+                    <ChevronLeft size={14} /> Skip / Return to Board
+                  </button>
                 </div>
+
+                <h1 className="host-question-text text-2xl md:text-3xl">
+                  {gameState.board.categories.find(c => c.id === gameState.currentQuestion?.categoryId)
+                    ?.questions.find(q => q.id === gameState.currentQuestion?.questionId)?.text}
+                </h1>
                 
                 <div className="host-answer-box space-y-2">
                   <p className="text-brand-accent text-xs font-black uppercase tracking-[0.2em]">Correct Answer</p>
