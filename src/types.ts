@@ -1,4 +1,4 @@
-export type GameStatus = 'lobby' | 'playing' | 'question' | 'buzzed' | 'ended';
+export type GameStatus = 'lobby' | 'playing' | 'question' | 'buzzed' | 'final_question_wager' | 'final_question_answer' | 'final_question_reveal' | 'ended';
 
 export interface Question {
   id: number;
@@ -15,13 +15,25 @@ export interface Category {
 }
 
 export interface GameBoard {
+  id: number;
+  name: string;
   categories: Category[];
+  isDoublePoints?: boolean;
+}
+
+export interface FinalQuestion {
+  category: string;
+  question: string;
+  answer: string;
 }
 
 export interface Player {
   id: string;
   name: string;
   score: number;
+  wager?: number;
+  finalAnswer?: string;
+  isCorrect?: boolean;
 }
 
 export interface GameState {
@@ -34,6 +46,8 @@ export interface GameState {
   } | null;
   buzzedPlayerId: string | null;
   buzzedAt: number | null;
-  board: GameBoard;
+  boards: GameBoard[];
+  currentBoardIndex: number;
+  finalQuestion: FinalQuestion;
   players: Player[];
 }

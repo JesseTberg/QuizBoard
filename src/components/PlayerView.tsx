@@ -1,8 +1,8 @@
-import { useState, FormEvent } from 'react';
+import { useState, FormEvent, useEffect } from 'react';
 import { GameState } from '../types';
 import socket from '../lib/socket';
 import { motion, AnimatePresence } from 'motion/react';
-import { Zap, Users, Monitor } from 'lucide-react';
+import { Zap, Users, Monitor, Star } from 'lucide-react';
 
 interface PlayerViewProps {
   gameState: GameState;
@@ -25,6 +25,30 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
     socket.emit('buzz', { gameId: gameState.id });
   };
 
+  const [wager, setWager] = useState<string>('');
+  const [finalAnswer, setFinalAnswer] = useState('');
+  const [isSubmitted, setIsSubmitted] = useState(false);
+
+  useEffect(() => {
+    setIsSubmitted(false);
+    if (gameState.status === 'final_question_wager') {
+      setWager('');
+    }
+  }, [gameState.status]);
+
+  const submitWager = (e: FormEvent) => {
+    e.preventDefault();
+    const wagerNum = parseInt(wager) || 0;
+    socket.emit('submit-wager', { gameId: gameState.id, wager: wagerNum });
+    setIsSubmitted(true);
+  };
+
+  const submitFinalAnswer = (e: FormEvent) => {
+    e.preventDefault();
+    socket.emit('submit-final-answer', { gameId: gameState.id, answer: finalAnswer });
+    setIsSubmitted(true);
+  };
+
   if (!currentPlayer) {
     return (
       <div className="app-container flex-center-col p-6">
@@ -35,7 +59,7 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
         >
           <div className="text-center-spacing">
             <Monitor className="w-12 h-12 text-brand-accent mx-auto" />
-            <h1 className="jeopardy-title text-4xl">READY TO PLAY?</h1>
+            <h1 className="game-title text-4xl">READY TO PLAY?</h1>
             <p className="text-brand-muted">Enter your name to join the session.</p>
           </div>
           <form onSubmit={joinGame} className="space-y-4">
@@ -82,7 +106,7 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
         <div className="text-right">
           <p className="text-[10px] text-brand-muted uppercase tracking-widest mb-1">Score</p>
           <p className={`text-2xl font-black font-mono leading-none ${currentPlayer.score >= 0 ? 'text-brand-accent' : 'text-red-500'}`}>
-            ${currentPlayer.score}
+            {currentPlayer.score}
           </p>
         </div>
       </div>
@@ -147,6 +171,80 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
               </button>
             </motion.div>
           )}
+
+          {gameState.status === 'final_question_wager' && (
+            <motion.div key="wager" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-md card-surface p-8 space-y-6">
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-black italic uppercase tracking-tighter text-brand-accent">Final Question Wager</h2>
+                <p className="text-brand-muted text-sm">Category: {gameState.finalQuestion.category}</p>
+                <p className="text-xs text-brand-muted">Max Wager: {Math.max(0, currentPlayer.score)}</p>
+              </div>
+              {!isSubmitted ? (
+                <form onSubmit={submitWager} className="space-y-4">
+                  <input 
+                    type="number"
+                    value={wager}
+                    onChange={(e) => setWager(e.target.value)}
+                    min={0}
+                    max={Math.max(0, currentPlayer.score)}
+                    placeholder="0"
+                    className="input-field w-full text-center text-3xl font-black"
+                  />
+                  <button type="submit" className="btn-accent w-full py-4 font-black italic uppercase">Submit Wager</button>
+                </form>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-brand-primary font-black italic animate-pulse">WAGER SUBMITTED</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {gameState.status === 'final_question_answer' && (
+            <motion.div key="final-answer" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="w-full max-w-md card-surface p-8 space-y-6">
+              <div className="text-center space-y-2">
+                <h2 className="text-2xl font-black italic uppercase tracking-tighter text-brand-accent">Final Question Answer</h2>
+                <p className="text-brand-muted text-sm">Category: {gameState.finalQuestion.category}</p>
+              </div>
+              {!isSubmitted ? (
+                <form onSubmit={submitFinalAnswer} className="space-y-4">
+                  <textarea 
+                    value={finalAnswer}
+                    onChange={(e) => setFinalAnswer(e.target.value)}
+                    placeholder="Type your answer here..."
+                    className="setup-textarea w-full text-center text-xl"
+                    required
+                  />
+                  <button type="submit" className="btn-accent w-full py-4 font-black italic uppercase">Submit Answer</button>
+                </form>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-brand-primary font-black italic animate-pulse">ANSWER SUBMITTED</p>
+                </div>
+              )}
+            </motion.div>
+          )}
+          {gameState.status === 'final_question_reveal' && (
+            <motion.div key="reveal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-6">
+              <div className="w-24 h-24 bg-brand-surface rounded-full flex items-center justify-center mx-auto border-2 border-brand-accent/30">
+                <Star className="text-brand-accent" size={40} />
+              </div>
+              <div className="space-y-2">
+                <h2 className="text-3xl font-black italic tracking-tighter text-brand-accent uppercase">Final Results</h2>
+                <p className="text-brand-muted">Check the board for the winner!</p>
+              </div>
+              {currentPlayer.isCorrect !== undefined && (
+                <div className={`p-6 rounded-xl border-2 ${currentPlayer.isCorrect ? 'bg-green-500/20 border-green-500' : 'bg-red-500/20 border-red-500'}`}>
+                  <p className="text-2xl font-black italic uppercase">
+                    {currentPlayer.isCorrect ? 'Correct!' : 'Incorrect'}
+                  </p>
+                  <p className="text-brand-muted mt-2">
+                    {currentPlayer.isCorrect ? '+' : '-'}{currentPlayer.wager} Points
+                  </p>
+                </div>
+              )}
+            </motion.div>
+          )}
         </AnimatePresence>
       </div>
 
@@ -166,7 +264,7 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
                 <span className="text-[10px] font-bold text-brand-muted">#{idx + 1}</span>
                 <span className="font-bold text-sm truncate max-w-[80px]">{player.name}</span>
                 <span className={`text-sm font-black ${player.score >= 0 ? 'text-brand-accent' : 'text-red-500'}`}>
-                  ${player.score}
+                  {player.score}
                 </span>
               </div>
             </div>

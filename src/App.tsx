@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import socket from './lib/socket';
-import { GameState, GameBoard } from './types';
-import { DEFAULT_BOARD } from './constants';
+import { GameState, GameBoard, FinalQuestion } from './types';
+import { DEFAULT_BOARDS } from './constants';
 import HostView from './components/HostView';
 import PlayerView from './components/PlayerView';
 import BoardView from './components/BoardView';
@@ -31,13 +31,13 @@ export default function App() {
     console.log('App mounted. GameId:', gameId, 'Role:', r);
 
     if (gameId) {
-      const hostKey = `jeopardy_host_${gameId}`;
+      const hostKey = `game_host_${gameId}`;
       
       // Allow transferring host status via URL parameter (used by Host QR code)
       const urlToken = params.get('hostToken');
       if (urlToken) {
         localStorage.setItem(hostKey, 'true');
-        localStorage.setItem(`jeopardy_token_${gameId}`, urlToken);
+        localStorage.setItem(`game_token_${gameId}`, urlToken);
         // Clean up URL
         params.delete('hostToken');
         window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
@@ -46,7 +46,7 @@ export default function App() {
       }
 
       const wasHost = localStorage.getItem(hostKey) === 'true';
-      const token = localStorage.getItem(`jeopardy_token_${gameId}`);
+      const token = localStorage.getItem(`game_token_${gameId}`);
       setHostToken(token);
       
       let initialRole = r || 'player';
@@ -77,8 +77,8 @@ export default function App() {
     socket.on('game-created', ({ game, hostToken }: { game: GameState, hostToken: string }) => {
       setGameState(game);
       setHostToken(hostToken);
-      localStorage.setItem(`jeopardy_host_${game.id}`, 'true');
-      localStorage.setItem(`jeopardy_token_${game.id}`, hostToken);
+      localStorage.setItem(`game_host_${game.id}`, 'true');
+      localStorage.setItem(`game_token_${game.id}`, hostToken);
       setIsHost(true);
       const newUrl = `${window.location.origin}?gameId=${game.id}&role=host`;
       window.history.pushState({}, '', newUrl);
@@ -103,8 +103,8 @@ export default function App() {
     };
   }, []);
 
-  const handleStartGame = (board: GameBoard) => {
-    socket.emit('create-game', { board });
+  const handleStartGame = (boards: GameBoard[], finalQuestion: FinalQuestion) => {
+    socket.emit('create-game', { boards, finalQuestion });
   };
 
   const handleRoleChange = (newRole: 'host' | 'player' | 'board' | 'setup') => {

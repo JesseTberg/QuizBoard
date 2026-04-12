@@ -37,6 +37,32 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
   };
 
   const buzzedPlayer = gameState.players.find(p => p.id === gameState.buzzedPlayerId);
+  const currentBoard = gameState.boards[gameState.currentBoardIndex];
+
+  const switchBoard = (index: number) => {
+    socket.emit('switch-board', { gameId: gameState.id, boardIndex: index });
+  };
+
+  const startFinalQuestion = () => {
+    socket.emit('start-final-question', { gameId: gameState.id });
+  };
+
+  const advanceToFinalQuestion = () => {
+    socket.emit('advance-to-final-question', { gameId: gameState.id });
+  };
+
+  const advanceToFinalReveal = () => {
+    socket.emit('advance-to-final-reveal', { gameId: gameState.id });
+  };
+
+  const markFinalResult = (playerId: string, correct: boolean) => {
+    socket.emit('mark-final-result', { gameId: gameState.id, playerId, correct });
+  };
+
+  const currentQuestionData = gameState.currentQuestion 
+    ? currentBoard.categories.find(c => c.id === gameState.currentQuestion?.categoryId)
+        ?.questions.find(q => q.id === gameState.currentQuestion?.questionId)
+    : null;
 
   return (
     <div className="host-container">
@@ -57,7 +83,7 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
                       <span className="font-bold text-sm">{player.name}</span>
                     </div>
                     <span className={`font-black text-sm ${player.score >= 0 ? 'text-brand-accent' : 'text-red-500'}`}>
-                      ${player.score}
+                      {player.score}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 justify-end">
@@ -86,6 +112,27 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
                   <p className="text-xs text-brand-muted italic">Waiting for players...</p>
                 </div>
               )}
+            </div>
+          </div>
+
+          <div className="card-surface p-6 text-center space-y-4">
+            <h2 className="text-xs font-black uppercase tracking-[0.2em] text-brand-muted text-left">Game Controls</h2>
+            <div className="grid grid-cols-1 gap-2">
+              {gameState.boards.map((board, idx) => (
+                <button
+                  key={board.id}
+                  onClick={() => switchBoard(idx)}
+                  className={`px-4 py-2 rounded text-[10px] font-black uppercase transition-all ${gameState.currentBoardIndex === idx ? 'bg-brand-accent text-blue-900' : 'bg-white/5 text-brand-muted hover:bg-white/10'}`}
+                >
+                  {board.name}
+                </button>
+              ))}
+              <button
+                onClick={startFinalQuestion}
+                className={`px-4 py-2 rounded text-[10px] font-black uppercase transition-all ${gameState.status.startsWith('final_question') ? 'bg-brand-primary text-white' : 'bg-white/5 text-brand-muted hover:bg-white/10'}`}
+              >
+                Final Question
+              </button>
             </div>
           </div>
 
@@ -159,7 +206,7 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
                 className="text-center-spacing"
               >
                 <div className="space-y-2">
-                  <h1 className="jeopardy-title text-6xl">GAME LOBBY</h1>
+                  <h1 className="game-title text-6xl">GAME LOBBY</h1>
                   <p className="text-brand-muted text-lg">Ready to start the session with {gameState.players.length} players?</p>
                 </div>
                 <button 
@@ -179,12 +226,12 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
                 className="w-full h-full flex flex-col"
               >
                 <div className="mb-6 text-center">
-                  <h1 className="text-2xl font-black italic tracking-tighter text-brand-primary">SELECT A QUESTION</h1>
-                  <p className="text-brand-muted text-xs uppercase tracking-widest">Click a value to force select (Host Override)</p>
+                  <h1 className="text-2xl font-black italic tracking-tighter text-brand-primary uppercase">{currentBoard.name}</h1>
+                  <p className="text-brand-muted text-xs uppercase tracking-widest">Select a question to display on the board</p>
                 </div>
                 
                 <div className="grid grid-cols-5 gap-4 flex-1 overflow-auto p-2">
-                  {gameState.board.categories.map(category => (
+                  {currentBoard.categories.map(category => (
                     <div key={category.id} className="space-y-2">
                       <div className="bg-brand-surface p-2 rounded text-center border border-brand-primary/20">
                         <p className="text-[10px] font-black uppercase truncate text-brand-primary">{category.title}</p>
@@ -200,7 +247,7 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
                               : 'bg-brand-primary/10 text-brand-primary border-brand-primary/30 hover:bg-brand-primary hover:text-white'}
                           `}
                         >
-                          ${question.points}
+                          {question.points}
                         </button>
                       ))}
                     </div>
@@ -221,7 +268,7 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
                       {gameState.status === 'question' ? 'Question Active' : 'Player Buzzed'}
                     </span>
                     <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest">
-                      {gameState.board.categories.find(c => c.id === gameState.currentQuestion?.categoryId)?.title} • ${gameState.board.categories.find(c => c.id === gameState.currentQuestion?.categoryId)?.questions.find(q => q.id === gameState.currentQuestion?.questionId)?.points}
+                      {currentQuestionData?.points} Points
                     </p>
                   </div>
                   <button 
@@ -233,15 +280,13 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
                 </div>
 
                 <h1 className="host-question-text text-2xl md:text-3xl">
-                  {gameState.board.categories.find(c => c.id === gameState.currentQuestion?.categoryId)
-                    ?.questions.find(q => q.id === gameState.currentQuestion?.questionId)?.text}
+                  {currentQuestionData?.text}
                 </h1>
                 
                 <div className="host-answer-box space-y-2">
                   <p className="text-brand-accent text-xs font-black uppercase tracking-[0.2em]">Correct Answer</p>
                   <p className="text-3xl font-black italic text-brand-accent">
-                    {gameState.board.categories.find(c => c.id === gameState.currentQuestion?.categoryId)
-                      ?.questions.find(q => q.id === gameState.currentQuestion?.questionId)?.answer}
+                    {currentQuestionData?.answer}
                   </p>
                 </div>
 
@@ -286,6 +331,83 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
                     </div>
                   </motion.div>
                 )}
+              </motion.div>
+            )}
+
+            {gameState.status === 'final_question_wager' && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-8">
+                <h1 className="game-title text-4xl uppercase">FINAL QUESTION WAGERS</h1>
+                <p className="text-brand-muted">Contestants are submitting their wagers...</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                  {gameState.players.map(p => (
+                    <div key={p.id} className="p-4 rounded bg-white/5 border border-white/10">
+                      <p className="text-xs font-black uppercase text-brand-muted">{p.name}</p>
+                      <p className="text-xl font-black italic text-brand-accent">{p.wager !== undefined ? 'WAGERED' : 'WAITING...'}</p>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  onClick={advanceToFinalQuestion}
+                  className="btn-primary px-12 py-4 text-xl italic tracking-tighter"
+                >
+                  ADVANCE TO QUESTION
+                </button>
+              </motion.div>
+            )}
+
+            {gameState.status === 'final_question_answer' && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-8">
+                <h1 className="game-title text-4xl uppercase">FINAL QUESTION ANSWERS</h1>
+                <p className="text-brand-muted">Contestants are typing their answers...</p>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                  {gameState.players.map(p => (
+                    <div key={p.id} className="p-4 rounded bg-white/5 border border-white/10">
+                      <p className="text-xs font-black uppercase text-brand-muted">{p.name}</p>
+                      <p className="text-xl font-black italic text-brand-accent">{p.finalAnswer ? 'ANSWERED' : 'WAITING...'}</p>
+                    </div>
+                  ))}
+                </div>
+                <button 
+                  onClick={advanceToFinalReveal}
+                  className="btn-primary px-12 py-4 text-xl italic tracking-tighter"
+                >
+                  REVEAL ANSWERS
+                </button>
+              </motion.div>
+            )}
+
+            {gameState.status === 'final_question_reveal' && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-8 overflow-auto max-h-full p-4">
+                <h1 className="game-title text-4xl">REVEAL & SCORE</h1>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
+                  {gameState.players.map(p => (
+                    <div key={p.id} className="p-6 rounded-xl bg-white/5 border border-white/10 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <p className="text-lg font-black italic uppercase text-brand-primary">{p.name}</p>
+                        <p className="text-brand-accent font-bold">Wager: {p.wager}</p>
+                      </div>
+                      <div className="bg-black/20 p-4 rounded italic text-xl">
+                        "{p.finalAnswer || 'No Answer'}"
+                      </div>
+                      <div className="flex gap-2">
+                        <button 
+                          onClick={() => markFinalResult(p.id, true)}
+                          disabled={p.isCorrect !== undefined}
+                          className={`flex-1 py-3 rounded font-black uppercase text-xs ${p.isCorrect === true ? 'bg-green-500 text-white' : 'bg-green-500/20 text-green-500 hover:bg-green-500/30'}`}
+                        >
+                          Correct
+                        </button>
+                        <button 
+                          onClick={() => markFinalResult(p.id, false)}
+                          disabled={p.isCorrect !== undefined}
+                          className={`flex-1 py-3 rounded font-black uppercase text-xs ${p.isCorrect === false ? 'bg-red-500 text-white' : 'bg-red-500/20 text-red-500 hover:bg-red-500/30'}`}
+                        >
+                          Incorrect
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </motion.div>
             )}
           </div>

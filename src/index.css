@@ -94,8 +94,8 @@ body {
   box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
 }
 
-/* Jeopardy Specific Classes */
-.jeopardy-title {
+/* Game Specific Classes */
+.game-title {
   font-size: 3.75rem;
   font-weight: 900;
   font-style: italic;

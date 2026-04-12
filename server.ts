@@ -34,7 +34,8 @@ io.on('connection', (socket) => {
       currentQuestion: null,
       buzzedPlayerId: null,
       buzzedAt: null,
-      buzzedHistory: [] // Track who buzzed for the current question
+      buzzedHistory: [],
+      currentBoardIndex: 0
     };
     games.set(gameId, game);
     socket.join(gameId);
@@ -109,7 +110,8 @@ io.on('connection', (socket) => {
     if (game && game.authorizedHosts.has(socket.id) && game.buzzedPlayerId) {
       const player = game.players.find(p => p.id === game.buzzedPlayerId);
       const { categoryId, questionId } = game.currentQuestion;
-      const category = game.board.categories.find(c => c.id === categoryId);
+      const currentBoard = game.boards[game.currentBoardIndex];
+      const category = currentBoard.categories.find(c => c.id === categoryId);
       const question = category.questions.find(q => q.id === questionId);
 
       if (player && question) {
@@ -134,7 +136,8 @@ io.on('connection', (socket) => {
     const game = games.get(gameId);
     if (game && game.authorizedHosts.has(socket.id) && game.currentQuestion) {
       const { categoryId, questionId } = game.currentQuestion;
-      const category = game.board.categories.find(c => c.id === categoryId);
+      const currentBoard = game.boards[game.currentBoardIndex];
+      const category = currentBoard.categories.find(c => c.id === categoryId);
       const question = category.questions.find(q => q.id === questionId);
       
       if (question) {
@@ -146,6 +149,94 @@ io.on('connection', (socket) => {
       game.buzzedPlayerId = null;
       game.buzzedHistory = [];
       io.to(gameId).emit('game-state', game);
+    }
+  });
+
+  socket.on('switch-board', ({ gameId, boardIndex }) => {
+    const game = games.get(gameId);
+    if (game && game.authorizedHosts.has(socket.id)) {
+      if (boardIndex >= 0 && boardIndex < game.boards.length) {
+        game.currentBoardIndex = boardIndex;
+        game.status = 'playing';
+        game.currentQuestion = null;
+        io.to(gameId).emit('game-state', game);
+      }
+    }
+  });
+
+  socket.on('start-final-question', ({ gameId }) => {
+    const game = games.get(gameId);
+    if (game && game.authorizedHosts.has(socket.id)) {
+      game.status = 'final_question_wager';
+      game.players.forEach(p => {
+        p.wager = undefined;
+        p.finalAnswer = undefined;
+        p.isCorrect = undefined;
+      });
+      io.to(gameId).emit('game-state', game);
+    }
+  });
+
+  socket.on('submit-wager', ({ gameId, wager }) => {
+    const game = games.get(gameId);
+    if (game && game.status === 'final_question_wager') {
+      const player = game.players.find(p => p.id === socket.id);
+      if (player) {
+        // Limit wager to player's current score (min 0)
+        const maxWager = Math.max(0, player.score);
+        player.wager = Math.min(maxWager, Math.max(0, wager));
+        
+        // Check if all players have submitted wagers
+        const allWagered = game.players.every(p => p.wager !== undefined);
+        if (allWagered) {
+          // Wait for host to advance manually or auto-advance? Let's let host advance.
+        }
+        io.to(gameId).emit('game-state', game);
+      }
+    }
+  });
+
+  socket.on('advance-to-final-question', ({ gameId }) => {
+    const game = games.get(gameId);
+    if (game && game.authorizedHosts.has(socket.id)) {
+      game.status = 'final_question_answer';
+      io.to(gameId).emit('game-state', game);
+    }
+  });
+
+  socket.on('submit-final-answer', ({ gameId, answer }) => {
+    const game = games.get(gameId);
+    if (game && game.status === 'final_question_answer') {
+      const player = game.players.find(p => p.id === socket.id);
+      if (player) {
+        player.finalAnswer = answer;
+        io.to(gameId).emit('game-state', game);
+      }
+    }
+  });
+
+  socket.on('advance-to-final-reveal', ({ gameId }) => {
+    const game = games.get(gameId);
+    if (game && game.authorizedHosts.has(socket.id)) {
+      game.status = 'final_question_reveal';
+      io.to(gameId).emit('game-state', game);
+    }
+  });
+
+  socket.on('mark-final-result', ({ gameId, playerId, correct }) => {
+    const game = games.get(gameId);
+    if (game && game.authorizedHosts.has(socket.id)) {
+      const player = game.players.find(p => p.id === playerId);
+      if (player && player.wager !== undefined) {
+        player.isCorrect = correct;
+        // Adjust score based on wager
+        if (correct) {
+          player.score += player.wager;
+        } else {
+          player.score -= player.wager;
+        }
+        io.to(gameId).emit('game-state', game);
+      }
     }
   });
 
