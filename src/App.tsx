@@ -38,6 +38,9 @@ export default function App() {
       if (urlToken) {
         localStorage.setItem(hostKey, 'true');
         localStorage.setItem(`jeopardy_token_${gameId}`, urlToken);
+        // Clean up URL
+        params.delete('hostToken');
+        window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
       } else if (params.get('isHost') === 'true') {
         localStorage.setItem(hostKey, 'true');
       }
@@ -58,7 +61,7 @@ export default function App() {
       if (wasHost) setIsHost(true);
       
       console.log('Emitting join-game for:', gameId, 'as', initialRole);
-      socket.emit('join-game', { gameId, role: initialRole, hostToken });
+      socket.emit('join-game', { gameId, role: initialRole, hostToken: token });
       setRole(initialRole);
     } else {
       setRole('setup');
