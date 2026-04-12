@@ -1,0 +1,5 @@
+{
+  "name": "Jeopardy Real-Time",
+  "description": "A real-time Jeopardy game with mobile buzzer support and host controls.",
+  "requestFramePermissions": []
+}
