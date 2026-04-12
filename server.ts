@@ -46,7 +46,7 @@ io.on('connection', (socket) => {
 
     socket.join(gameId);
 
-    if (role === 'player') {
+    if (role === 'player' && name) {
       // Prevent duplicate players with the same socket ID
       const existingPlayerIndex = game.players.findIndex(p => p.id === socket.id);
       if (existingPlayerIndex === -1) {

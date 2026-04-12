@@ -13,25 +13,55 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [role, setRole] = useState<'host' | 'player' | 'board' | 'setup' | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(socket.connected);
+  const [isHost, setIsHost] = useState(false);
 
   useEffect(() => {
+    const onConnect = () => setIsConnected(true);
+    const onDisconnect = () => setIsConnected(false);
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
+
     const params = new URLSearchParams(window.location.search);
     const gameId = params.get('gameId');
     const r = params.get('role') as any;
 
+    console.log('App mounted. GameId:', gameId, 'Role:', r);
+
     if (gameId) {
-      socket.emit('join-game', { gameId, role: r });
-      setRole(r || 'player');
+      const hostKey = `jeopardy_host_${gameId}`;
+      const wasHost = localStorage.getItem(hostKey) === 'true';
+      
+      let initialRole = r || 'player';
+      // Restrict access to host/setup if not the original host
+      if ((initialRole === 'host' || initialRole === 'setup') && !wasHost) {
+        console.warn('Unauthorized access attempt to host/setup view. Redirecting to player.');
+        initialRole = 'player';
+        params.set('role', 'player');
+        window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+      }
+
+      if (wasHost) setIsHost(true);
+      
+      console.log('Emitting join-game for:', gameId, 'as', initialRole);
+      socket.emit('join-game', { gameId, role: initialRole });
+      setRole(initialRole);
     } else {
       setRole('setup');
     }
 
-    socket.on('game-state', (state: GameState) => {
+    const handleGameState = (state: GameState) => {
+      console.log('Received game-state:', state.id);
       setGameState(state);
-    });
+    };
+
+    socket.on('game-state', handleGameState);
 
     socket.on('game-created', (state: GameState) => {
       setGameState(state);
+      localStorage.setItem(`jeopardy_host_${state.id}`, 'true');
+      setIsHost(true);
       const newUrl = `${window.location.origin}?gameId=${state.id}&role=host`;
       window.history.pushState({}, '', newUrl);
       setRole('host');
@@ -46,6 +76,8 @@ export default function App() {
     });
 
     return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
       socket.off('game-state');
       socket.off('game-created');
       socket.off('player-joined');
@@ -57,9 +89,27 @@ export default function App() {
     socket.emit('create-game', { board });
   };
 
+  const handleRoleChange = (newRole: 'host' | 'player' | 'board' | 'setup') => {
+    setRole(newRole);
+    if (gameState) {
+      const params = new URLSearchParams(window.location.search);
+      params.set('role', newRole);
+      window.history.pushState({}, '', `${window.location.pathname}?${params.toString()}`);
+    }
+  };
+
   const openPlayerTab = () => {
     if (gameState) {
-      window.open(`${window.location.origin}?gameId=${gameState.id}&role=player`, '_blank');
+      const url = `${window.location.origin}?gameId=${gameState.id}&role=player`;
+      window.open(url, '_blank');
+    }
+  };
+
+  const copyJoinLink = () => {
+    if (gameState) {
+      const url = `${window.location.origin}?gameId=${gameState.id}&role=player`;
+      navigator.clipboard.writeText(url);
+      alert('Join link copied to clipboard!');
     }
   };
 
@@ -79,35 +129,46 @@ export default function App() {
 
   return (
     <div className="app-container selection:bg-brand-primary/30">
+      {!isConnected && (
+        <div className="fixed inset-0 bg-brand-bg/80 backdrop-blur-sm z-[100] flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-brand-muted font-bold tracking-widest uppercase">Connecting to Server...</p>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="floating-error">
           <X size={20} /> {error}
         </div>
       )}
 
-      {/* Persistent View Switcher Menu */}
-      <div className="view-switcher">
-        {[
-          { id: 'setup', label: 'SETUP', icon: Settings },
-          { id: 'host', label: 'HOST', icon: Monitor },
-          { id: 'player', label: 'PLAYER', icon: Users },
-          { id: 'board', label: 'BOARD', icon: Monitor }
-        ].map((item) => (
-          <button
-            key={item.id}
-            onClick={() => setRole(item.id as any)}
-            className={`view-switcher-btn ${role === item.id ? 'view-switcher-btn-active' : ''}`}
-          >
-            <item.icon size={14} />
-            <span className="hidden sm:inline">{item.label}</span>
-          </button>
-        ))}
-      </div>
+      {/* Persistent View Switcher Menu - Only for Host */}
+      {isHost && (
+        <div className="view-switcher">
+            { [
+              { id: 'setup', label: 'SETUP', icon: Settings },
+              { id: 'host', label: 'HOST', icon: Monitor },
+              { id: 'player', label: 'PLAYER', icon: Users },
+              { id: 'board', label: 'BOARD', icon: Monitor }
+            ].map((item) => (
+              <button
+                key={item.id}
+                onClick={() => handleRoleChange(item.id as any)}
+                className={`view-switcher-btn ${role === item.id ? 'view-switcher-btn-active' : ''}`}
+              >
+              <item.icon size={14} />
+              <span className="hidden sm:inline">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {role === 'setup' && <SetupView onStart={handleStartGame} />}
       
-      {/* Global Test & Navigation Controls */}
-      {gameState && (
+      {/* Global Test & Navigation Controls - Only for Host */}
+      {gameState && isHost && (
         <div className="test-controls">
           {role === 'host' && (
             <button onClick={resetToSetup} className="btn-test btn-test-setup" title="Back to Setup">
@@ -115,7 +176,10 @@ export default function App() {
             </button>
           )}
           <button onClick={openPlayerTab} className="btn-test btn-test-player" title="Open Player Tab">
-            <Users size={20} /> <span className="hidden md:inline">Test: Join as Player</span>
+            <Users size={20} /> <span className="hidden md:inline">Open Player Tab</span>
+          </button>
+          <button onClick={copyJoinLink} className="btn-test btn-test-setup" title="Copy Join Link">
+            <PlayCircle size={20} /> <span className="hidden md:inline">Copy Link</span>
           </button>
         </div>
       )}

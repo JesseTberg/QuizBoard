@@ -11,7 +11,7 @@ interface PlayerViewProps {
 export default function PlayerView({ gameState }: PlayerViewProps) {
   const [name, setName] = useState('');
   const [isJoining, setIsJoining] = useState(false);
-  const currentPlayer = gameState.players.find(p => p.id === socket.id);
+  const currentPlayer = socket.id ? gameState.players.find(p => p.id === socket.id) : null;
 
   const joinGame = (e: FormEvent) => {
     e.preventDefault();
