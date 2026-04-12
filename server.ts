@@ -3,6 +3,65 @@ import { createServer } from 'http';
 import { Server } from 'socket.io';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
+import type {
+  Category,
+  FinalQuestion,
+  GameBoard,
+  GameState,
+  Player,
+  Question,
+} from './src/types';
+
+interface InternalGame extends GameState {
+  hostToken: string;
+  authorizedHosts: Set<string>;
+  buzzedHistory: string[];
+}
+
+interface CreateGamePayload {
+  boards: GameBoard[];
+  finalQuestion: FinalQuestion;
+  [key: string]: unknown;
+}
+
+interface JoinGamePayload {
+  gameId: string;
+  name?: string;
+  role: 'host' | 'player';
+  hostToken?: string;
+}
+
+interface SelectQuestionPayload {
+  gameId: string;
+  categoryId: number;
+  questionId: number;
+}
+
+interface GameIdPayload {
+  gameId: string;
+}
+
+interface SubmitWagerPayload {
+  gameId: string;
+  wager: number;
+}
+
+interface SwitchBoardPayload {
+  gameId: string;
+  boardIndex: number;
+}
+
+interface MarkFinalResultPayload {
+  gameId: string;
+  playerId: string;
+  correct: boolean;
+}
+
+interface AdjustScorePayload {
+  gameId: string;
+  playerId: string;
+  amount: number;
+}
 
 const app = express();
 const httpServer = createServer(app);
@@ -16,19 +75,21 @@ const io = new Server(httpServer, {
 const PORT = Number(process.env.PORT) || 3000;
 
 // In-memory game state
-const games = new Map();
+const games = new Map<string, InternalGame>();
 
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  socket.on('create-game', (gameData) => {
+  socket.on('create-game', (gameData: CreateGamePayload) => {
     const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const hostToken = Math.random().toString(36).substring(2, 15);
-    const game = {
+    const game: InternalGame = {
       id: gameId,
+      hostId: socket.id,
       hostToken,
       authorizedHosts: new Set([socket.id]),
-      ...gameData,
+      boards: gameData.boards,
+      finalQuestion: gameData.finalQuestion,
       players: [],
       status: 'lobby',
       currentQuestion: null,
@@ -42,7 +103,8 @@ io.on('connection', (socket) => {
     socket.emit('game-created', { game, hostToken });
   });
 
-  socket.on('join-game', ({ gameId, name, role, hostToken }) => {
+  socket.on('join-game', (payload: JoinGamePayload) => {
+    const { gameId, name, role, hostToken } = payload;
     const game = games.get(gameId);
     if (!game) {
       socket.emit('error', 'Game not found');
@@ -77,7 +139,8 @@ io.on('connection', (socket) => {
     socket.emit('game-state', game);
   });
 
-  socket.on('select-question', ({ gameId, categoryId, questionId }) => {
+  socket.on('select-question', (payload: SelectQuestionPayload) => {
+    const { gameId, categoryId, questionId } = payload;
     const game = games.get(gameId);
     if (game && game.authorizedHosts.has(socket.id)) {
       game.status = 'question';
@@ -89,7 +152,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('buzz', ({ gameId }) => {
+  socket.on('buzz', ({ gameId }: GameIdPayload) => {
     const game = games.get(gameId);
     if (game && game.status === 'question' && !game.buzzedPlayerId) {
       // Check if player already buzzed for this question
@@ -105,7 +168,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('answer-result', ({ gameId, correct }) => {
+  socket.on('answer-result', ({ gameId, correct }: { gameId: string; correct: boolean }) => {
     const game = games.get(gameId);
     if (game && game.authorizedHosts.has(socket.id) && game.buzzedPlayerId) {
       const player = game.players.find(p => p.id === game.buzzedPlayerId);
@@ -132,7 +195,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('skip-question', ({ gameId }) => {
+  socket.on('skip-question', ({ gameId }: GameIdPayload) => {
     const game = games.get(gameId);
     if (game && game.authorizedHosts.has(socket.id) && game.currentQuestion) {
       const { categoryId, questionId } = game.currentQuestion;
@@ -152,7 +215,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('switch-board', ({ gameId, boardIndex }) => {
+  socket.on('switch-board', (payload: SwitchBoardPayload) => {
+    const { gameId, boardIndex } = payload;
     const game = games.get(gameId);
     if (game && game.authorizedHosts.has(socket.id)) {
       if (boardIndex >= 0 && boardIndex < game.boards.length) {
@@ -177,7 +241,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('submit-wager', ({ gameId, wager }) => {
+  socket.on('submit-wager', (payload: SubmitWagerPayload) => {
+    const { gameId, wager } = payload;
     const game = games.get(gameId);
     if (game && game.status === 'final_question_wager') {
       const player = game.players.find(p => p.id === socket.id);
@@ -223,7 +288,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('mark-final-result', ({ gameId, playerId, correct }) => {
+  socket.on('mark-final-result', (payload: MarkFinalResultPayload) => {
+    const { gameId, playerId, correct } = payload;
     const game = games.get(gameId);
     if (game && game.authorizedHosts.has(socket.id)) {
       const player = game.players.find(p => p.id === playerId);
@@ -240,7 +306,8 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('adjust-score', ({ gameId, playerId, amount }) => {
+  socket.on('adjust-score', (payload: AdjustScorePayload) => {
+    const { gameId, playerId, amount } = payload;
     const game = games.get(gameId);
     if (game && game.authorizedHosts.has(socket.id)) {
       const player = game.players.find(p => p.id === playerId);
@@ -251,7 +318,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('start-game', (gameId) => {
+  socket.on('start-game', (gameId: string) => {
     const game = games.get(gameId);
     if (game && game.authorizedHosts.has(socket.id)) {
       game.status = 'playing';

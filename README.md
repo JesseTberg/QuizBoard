@@ -2,6 +2,8 @@
 
 A Jeopardy-inspired real-time quiz game built with React, Vite, Express, and Socket.io.
 
+> Hosted on Render: https://quizboards.onrender.com/
+
 ## Features
 
 - Real-time question board and score updates
