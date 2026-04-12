@@ -23,8 +23,11 @@ io.on('connection', (socket) => {
 
   socket.on('create-game', (gameData) => {
     const gameId = Math.random().toString(36).substring(2, 8).toUpperCase();
+    const hostToken = Math.random().toString(36).substring(2, 15);
     const game = {
       id: gameId,
+      hostToken,
+      authorizedHosts: new Set([socket.id]),
       ...gameData,
       players: [],
       status: 'lobby',
@@ -35,10 +38,10 @@ io.on('connection', (socket) => {
     };
     games.set(gameId, game);
     socket.join(gameId);
-    socket.emit('game-created', game);
+    socket.emit('game-created', { game, hostToken });
   });
 
-  socket.on('join-game', ({ gameId, name, role }) => {
+  socket.on('join-game', ({ gameId, name, role, hostToken }) => {
     const game = games.get(gameId);
     if (!game) {
       socket.emit('error', 'Game not found');
@@ -46,6 +49,16 @@ io.on('connection', (socket) => {
     }
 
     socket.join(gameId);
+
+    if (role === 'host') {
+      if (game.hostToken === hostToken) {
+        game.authorizedHosts.add(socket.id);
+        socket.emit('host-authorized', { hostToken });
+      } else {
+        socket.emit('error', 'Unauthorized: Invalid host token');
+        return;
+      }
+    }
 
     if (role === 'player' && name) {
       // Prevent duplicate players with the same socket ID
@@ -65,7 +78,7 @@ io.on('connection', (socket) => {
 
   socket.on('select-question', ({ gameId, categoryId, questionId }) => {
     const game = games.get(gameId);
-    if (game) {
+    if (game && game.authorizedHosts.has(socket.id)) {
       game.status = 'question';
       game.currentQuestion = { categoryId, questionId };
       game.buzzedPlayerId = null;
@@ -93,7 +106,7 @@ io.on('connection', (socket) => {
 
   socket.on('answer-result', ({ gameId, correct }) => {
     const game = games.get(gameId);
-    if (game && game.buzzedPlayerId) {
+    if (game && game.authorizedHosts.has(socket.id) && game.buzzedPlayerId) {
       const player = game.players.find(p => p.id === game.buzzedPlayerId);
       const { categoryId, questionId } = game.currentQuestion;
       const category = game.board.categories.find(c => c.id === categoryId);
@@ -119,7 +132,7 @@ io.on('connection', (socket) => {
 
   socket.on('skip-question', ({ gameId }) => {
     const game = games.get(gameId);
-    if (game && game.currentQuestion) {
+    if (game && game.authorizedHosts.has(socket.id) && game.currentQuestion) {
       const { categoryId, questionId } = game.currentQuestion;
       const category = game.board.categories.find(c => c.id === categoryId);
       const question = category.questions.find(q => q.id === questionId);
@@ -138,7 +151,7 @@ io.on('connection', (socket) => {
 
   socket.on('adjust-score', ({ gameId, playerId, amount }) => {
     const game = games.get(gameId);
-    if (game) {
+    if (game && game.authorizedHosts.has(socket.id)) {
       const player = game.players.find(p => p.id === playerId);
       if (player) {
         player.score += amount;
@@ -149,7 +162,7 @@ io.on('connection', (socket) => {
 
   socket.on('start-game', (gameId) => {
     const game = games.get(gameId);
-    if (game) {
+    if (game && game.authorizedHosts.has(socket.id)) {
       game.status = 'playing';
       io.to(gameId).emit('game-state', game);
     }

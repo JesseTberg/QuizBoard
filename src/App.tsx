@@ -15,6 +15,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [isConnected, setIsConnected] = useState(socket.connected);
   const [isHost, setIsHost] = useState(false);
+  const [hostToken, setHostToken] = useState<string | null>(null);
 
   useEffect(() => {
     const onConnect = () => setIsConnected(true);
@@ -31,7 +32,19 @@ export default function App() {
 
     if (gameId) {
       const hostKey = `jeopardy_host_${gameId}`;
+      
+      // Allow transferring host status via URL parameter (used by Host QR code)
+      const urlToken = params.get('hostToken');
+      if (urlToken) {
+        localStorage.setItem(hostKey, 'true');
+        localStorage.setItem(`jeopardy_token_${gameId}`, urlToken);
+      } else if (params.get('isHost') === 'true') {
+        localStorage.setItem(hostKey, 'true');
+      }
+
       const wasHost = localStorage.getItem(hostKey) === 'true';
+      const token = localStorage.getItem(`jeopardy_token_${gameId}`);
+      setHostToken(token);
       
       let initialRole = r || 'player';
       // Restrict access to host/setup if not the original host
@@ -45,7 +58,7 @@ export default function App() {
       if (wasHost) setIsHost(true);
       
       console.log('Emitting join-game for:', gameId, 'as', initialRole);
-      socket.emit('join-game', { gameId, role: initialRole });
+      socket.emit('join-game', { gameId, role: initialRole, hostToken });
       setRole(initialRole);
     } else {
       setRole('setup');
@@ -58,11 +71,13 @@ export default function App() {
 
     socket.on('game-state', handleGameState);
 
-    socket.on('game-created', (state: GameState) => {
-      setGameState(state);
-      localStorage.setItem(`jeopardy_host_${state.id}`, 'true');
+    socket.on('game-created', ({ game, hostToken }: { game: GameState, hostToken: string }) => {
+      setGameState(game);
+      setHostToken(hostToken);
+      localStorage.setItem(`jeopardy_host_${game.id}`, 'true');
+      localStorage.setItem(`jeopardy_token_${game.id}`, hostToken);
       setIsHost(true);
-      const newUrl = `${window.location.origin}?gameId=${state.id}&role=host`;
+      const newUrl = `${window.location.origin}?gameId=${game.id}&role=host`;
       window.history.pushState({}, '', newUrl);
       setRole('host');
     });
@@ -186,7 +201,7 @@ export default function App() {
 
       {gameState && (
         <div className="relative min-h-screen">
-          {role === 'host' && <HostView gameState={gameState} />}
+          {role === 'host' && <HostView gameState={gameState} hostToken={hostToken} />}
           {role === 'player' && <PlayerView gameState={gameState} />}
           {role === 'board' && <BoardView gameState={gameState} />}
         </div>

@@ -7,13 +7,14 @@ import { motion, AnimatePresence } from 'motion/react';
 
 interface HostViewProps {
   gameState: GameState;
+  hostToken: string | null;
 }
 
-export default function HostView({ gameState }: HostViewProps) {
+export default function HostView({ gameState, hostToken }: HostViewProps) {
   const [showHostQR, setShowHostQR] = useState(false);
   const joinUrl = `${window.location.origin}?gameId=${gameState.id}&role=player`;
   const boardUrl = `${window.location.origin}?gameId=${gameState.id}&role=board`;
-  const hostUrl = `${window.location.origin}?gameId=${gameState.id}&role=host`;
+  const hostUrl = `${window.location.origin}?gameId=${gameState.id}&role=host&hostToken=${hostToken || ''}`;
 
   const startGame = () => {
     socket.emit('start-game', gameState.id);
