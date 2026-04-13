@@ -8,6 +8,7 @@ import BoardView from './components/BoardView';
 import SetupView from './components/SetupView';
 import { Users, PlayCircle, Settings, X, Monitor } from 'lucide-react';
 import { motion } from 'motion/react';
+import { Footer } from './components/footer';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -222,6 +223,7 @@ export default function App() {
           <button onClick={() => setRole('setup')} className="btn-primary">GO TO SETUP</button>
         </div>
       )}
+      <Footer />
     </div>
   );
 }
