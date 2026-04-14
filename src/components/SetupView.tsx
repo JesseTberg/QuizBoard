@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useState, ChangeEvent } from 'react';
 import { GameBoard, Category, Question, FinalQuestion } from '../types';
 import { DEFAULT_BOARDS, DEFAULT_FINAL_QUESTION } from '../constants';
-import { Plus, Trash2, Play, Monitor, Layers, Star } from 'lucide-react';
+import { Plus, Trash2, Play, Monitor, Layers, Star, Upload } from 'lucide-react';
 import { motion } from 'motion/react';
 
 interface SetupViewProps {
@@ -28,6 +28,17 @@ export default function SetupView({ onStart }: SetupViewProps) {
         questions: c.questions.map(q => q.id === qId ? { ...q, [field]: value } : q)
       } : c)
     } : b));
+  };
+
+  const handleImageUpload = (e: ChangeEvent<HTMLInputElement>, callback: (url: string) => void) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        callback(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const toggleDoublePoints = (boardIdx: number) => {
@@ -150,6 +161,35 @@ export default function SetupView({ onStart }: SetupViewProps) {
                       className="setup-input-small"
                       placeholder="Answer"
                     />
+                    <div className="flex gap-2">
+                      <input 
+                        type="text"
+                        value={question.imageUrl || ''}
+                        onChange={(e) => updateQuestion(activeBoardIndex, category.id, question.id, 'imageUrl', e.target.value)}
+                        className="setup-input-small flex-1"
+                        placeholder="Image URL"
+                      />
+                      <label className="p-2 bg-brand-primary/10 text-brand-primary rounded cursor-pointer hover:bg-brand-primary/20 transition-colors">
+                        <Upload size={14} />
+                        <input 
+                          type="file" 
+                          className="hidden" 
+                          accept="image/*"
+                          onChange={(e) => handleImageUpload(e, (url) => updateQuestion(activeBoardIndex, category.id, question.id, 'imageUrl', url))}
+                        />
+                      </label>
+                    </div>
+                    {question.imageUrl && (
+                      <div className="mt-2 relative group rounded overflow-hidden border border-white/10 aspect-video bg-black/20">
+                        <img src={question.imageUrl} alt="Preview" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                        <button 
+                          onClick={() => updateQuestion(activeBoardIndex, category.id, question.id, 'imageUrl', '')}
+                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <Trash2 size={10} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -189,10 +229,42 @@ export default function SetupView({ onStart }: SetupViewProps) {
                 className="setup-input-small"
               />
             </div>
+            <div>
+              <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted mb-1 block">Image (URL or Upload)</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text"
+                  value={finalQuestion.imageUrl || ''}
+                  onChange={(e) => setFinalQuestion({ ...finalQuestion, imageUrl: e.target.value })}
+                  className="setup-input-small flex-1"
+                  placeholder="https://..."
+                />
+                <label className="p-2 bg-brand-primary/10 text-brand-primary rounded cursor-pointer hover:bg-brand-primary/20 transition-colors">
+                  <Upload size={14} />
+                  <input 
+                    type="file" 
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={(e) => handleImageUpload(e, (url) => setFinalQuestion({ ...finalQuestion, imageUrl: url }))}
+                  />
+                </label>
+              </div>
+              {finalQuestion.imageUrl && (
+                <div className="mt-4 relative group rounded-xl overflow-hidden border border-white/10 aspect-video bg-black/20">
+                  <img src={finalQuestion.imageUrl} alt="Final Preview" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
+                  <button 
+                    onClick={() => setFinalQuestion({ ...finalQuestion, imageUrl: '' })}
+                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="setup-actions mt-12">
+        <div className="setup-actions mt-8 pb-8">
           <button 
             onClick={() => onStart(boards, finalQuestion)}
             className="btn-accent px-16 py-6 text-2xl italic tracking-tighter"

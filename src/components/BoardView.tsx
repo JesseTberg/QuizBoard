@@ -76,6 +76,20 @@ export default function BoardView({ gameState }: BoardViewProps) {
               <div className="space-y-8 md:space-y-16 max-w-6xl">
                 <div className="space-y-4">
                   <p className="text-brand-primary font-black uppercase tracking-[0.4em] text-xs md:text-sm">Question</p>
+                  {currentQuestionData?.imageUrl && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="max-w-2xl mx-auto mb-8 rounded-2xl overflow-hidden border-4 border-brand-primary/30 shadow-2xl bg-black/40"
+                    >
+                      <img 
+                        src={currentQuestionData.imageUrl} 
+                        alt="Question Visual" 
+                        className="w-full h-auto max-h-[40vh] object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                    </motion.div>
+                  )}
                   <h2 className="question-text drop-shadow-2xl">
                     {currentQuestionData?.text}
                   </h2>
@@ -115,6 +129,16 @@ export default function BoardView({ gameState }: BoardViewProps) {
 
                 {gameState.status === 'final_question_answer' && (
                   <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-8">
+                    {gameState.finalQuestion.imageUrl && (
+                      <div className="max-w-2xl mx-auto rounded-2xl overflow-hidden border-4 border-brand-accent/30 shadow-2xl bg-black/40">
+                        <img 
+                          src={gameState.finalQuestion.imageUrl} 
+                          alt="Final Question Visual" 
+                          className="w-full h-auto max-h-[40vh] object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    )}
                     <h2 className="question-text drop-shadow-2xl">
                       {gameState.finalQuestion.question}
                     </h2>

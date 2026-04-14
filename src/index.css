@@ -191,10 +191,11 @@ body {
 
 /* Setup View Classes */
 .setup-container {
-  min-height: 100vh;
   background-color: var(--brand-bg);
   color: var(--brand-text);
   padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
 }
 
 .setup-category-input {
@@ -437,18 +438,18 @@ body {
 
 .view-switcher {
   position: fixed;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
   background-color: rgba(15, 23, 42, 0.8);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 1rem;
-  padding: 0.25rem;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
   display: flex;
-  gap: 0.25rem;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .view-switcher-btn {
@@ -694,12 +695,16 @@ body {
   }
 }
 
-.qr-container {
-  background-color: white;
-  padding: 0.75rem;
-  border-radius: 1rem;
-  display: inline-block;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+.qr-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  user-select: none;
+}
+
+.qr-section-header:hover {
+  opacity: 0.8;
 }
 
 .host-question-display {
@@ -749,8 +754,8 @@ body {
 }
 
 .section-spacing {
-  margin-top: 3rem;
-  margin-bottom: 3rem;
+  margin-top: 2rem;
+  margin-bottom: 2rem;
 }
 
 .flex-center-col {

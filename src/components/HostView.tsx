@@ -1,7 +1,7 @@
 import { GameState } from '../types';
 import socket from '../lib/socket';
 import { QRCodeSVG } from 'qrcode.react';
-import { Check, X, RefreshCw, Play, Users, Monitor, Zap, QrCode, Plus, Minus, ChevronLeft } from 'lucide-react';
+import { Check, X, RefreshCw, Play, Users, Monitor, Zap, QrCode, Plus, Minus, ChevronLeft, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -12,6 +12,7 @@ interface HostViewProps {
 
 export default function HostView({ gameState, hostToken }: HostViewProps) {
   const [showHostQR, setShowHostQR] = useState(false);
+  const [isQRCollapsed, setIsQRCollapsed] = useState(false);
   const joinUrl = `${window.location.origin}?gameId=${gameState.id}&role=player`;
   const boardUrl = `${window.location.origin}?gameId=${gameState.id}&role=board`;
   const hostUrl = `${window.location.origin}?gameId=${gameState.id}&role=host&hostToken=${hostToken || ''}`;
@@ -137,59 +138,83 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
           </div>
 
           <div className="card-surface p-6 text-center space-y-6">
-            <div className="flex items-center justify-between gap-2">
-              <div className="text-left">
-                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-brand-muted">Session</h2>
-                <p className="text-[10px] text-slate-500 font-mono">{gameState.id}</p>
+            <div 
+              className="qr-section-header"
+              onClick={() => setIsQRCollapsed(!isQRCollapsed)}
+            >
+              <div className="flex items-center gap-2">
+                <QrCode size={16} className="text-brand-muted" />
+                <h2 className="text-xs font-black uppercase tracking-[0.2em] text-brand-muted">Join Session</h2>
               </div>
-              <button 
-                onClick={() => setShowHostQR(!showHostQR)}
-                className={`p-2 rounded-lg transition-colors ${showHostQR ? 'bg-brand-primary text-white' : 'bg-white/5 text-brand-muted hover:bg-white/10'}`}
-                title="Show Host QR"
-              >
-                <QrCode size={16} />
-              </button>
+              {isQRCollapsed ? <ChevronDown size={14} className="text-brand-muted" /> : <ChevronUp size={14} className="text-brand-muted" />}
             </div>
 
-            <AnimatePresence mode="wait">
-              {showHostQR ? (
-                <motion.div 
-                  key="host-qr"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="space-y-4"
+            <AnimatePresence>
+              {!isQRCollapsed && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  className="overflow-hidden space-y-6"
                 >
-                  <div className="qr-container bg-brand-accent/10 p-2 rounded-xl border border-brand-accent/20">
-                    <QRCodeSVG value={hostUrl} size={140} />
+                  <div className="flex items-center justify-between gap-2 pt-2">
+                    <div className="text-left">
+                      <p className="text-[10px] text-slate-500 font-mono">{gameState.id}</p>
+                    </div>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowHostQR(!showHostQR);
+                      }}
+                      className={`p-2 rounded-lg transition-colors ${showHostQR ? 'bg-brand-primary text-white' : 'bg-white/5 text-brand-muted hover:bg-white/10'}`}
+                      title="Show Host QR"
+                    >
+                      <QrCode size={16} />
+                    </button>
                   </div>
-                  <p className="text-[10px] text-brand-accent font-bold uppercase tracking-widest">Host View QR</p>
-                </motion.div>
-              ) : (
-                <motion.div 
-                  key="join-qr"
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  className="space-y-4"
-                >
-                  <div className="qr-container">
-                    <QRCodeSVG value={joinUrl} size={140} />
+
+                  <AnimatePresence mode="wait">
+                    {showHostQR ? (
+                      <motion.div 
+                        key="host-qr"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="space-y-4"
+                      >
+                        <div className="bg-white p-2 rounded-xl inline-block shadow-lg border border-brand-accent/20">
+                          <QRCodeSVG value={hostUrl} size={140} />
+                        </div>
+                        <p className="text-[10px] text-brand-accent font-bold uppercase tracking-widest">Host View QR</p>
+                      </motion.div>
+                    ) : (
+                      <motion.div 
+                        key="join-qr"
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        exit={{ opacity: 0, scale: 0.9 }}
+                        className="space-y-4"
+                      >
+                        <div className="bg-white p-2 rounded-xl inline-block shadow-lg">
+                          <QRCodeSVG value={joinUrl} size={140} />
+                        </div>
+                        <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest">Player Join QR</p>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  <div className="space-y-2">
+                    <a 
+                      href={boardUrl} 
+                      target="_blank" 
+                      className="btn-primary w-full py-3 text-xs tracking-widest"
+                    >
+                      <Monitor size={14} /> Board View
+                    </a>
                   </div>
-                  <p className="text-[10px] text-brand-muted font-bold uppercase tracking-widest">Player Join QR</p>
                 </motion.div>
               )}
             </AnimatePresence>
-
-            <div className="space-y-2">
-              <a 
-                href={boardUrl} 
-                target="_blank" 
-                className="btn-primary w-full py-3 text-xs tracking-widest"
-              >
-                <Monitor size={14} /> Board View
-              </a>
-            </div>
           </div>
         </div>
 
@@ -282,6 +307,17 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
                 <h1 className="host-question-text text-2xl md:text-3xl">
                   {currentQuestionData?.text}
                 </h1>
+
+                {currentQuestionData?.imageUrl && (
+                  <div className="max-w-xs mx-auto rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                    <img 
+                      src={currentQuestionData.imageUrl} 
+                      alt="Question Visual" 
+                      className="w-full h-auto object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                )}
                 
                 <div className="host-answer-box space-y-2">
                   <p className="text-brand-accent text-xs font-black uppercase tracking-[0.2em]">Correct Answer</p>
@@ -358,6 +394,11 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
             {gameState.status === 'final_question_answer' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-8">
                 <h1 className="game-title text-4xl uppercase">FINAL QUESTION ANSWERS</h1>
+                {gameState.finalQuestion.imageUrl && (
+                  <div className="max-w-xs mx-auto rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                    <img src={gameState.finalQuestion.imageUrl} alt="Final Question Visual" className="w-full h-auto object-contain" referrerPolicy="no-referrer" />
+                  </div>
+                )}
                 <p className="text-brand-muted">Contestants are typing their answers...</p>
                 <div className="grid grid-cols-2 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
                   {gameState.players.map(p => (
@@ -379,6 +420,11 @@ export default function HostView({ gameState, hostToken }: HostViewProps) {
             {gameState.status === 'final_question_reveal' && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center space-y-8 overflow-auto max-h-full p-4">
                 <h1 className="game-title text-4xl">REVEAL & SCORE</h1>
+                {gameState.finalQuestion.imageUrl && (
+                  <div className="max-w-xs mx-auto rounded-lg overflow-hidden border border-white/10 bg-black/20">
+                    <img src={gameState.finalQuestion.imageUrl} alt="Final Question Visual" className="w-full h-auto object-contain" referrerPolicy="no-referrer" />
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-4xl mx-auto">
                   {gameState.players.map(p => (
                     <div key={p.id} className="p-6 rounded-xl bg-white/5 border border-white/10 space-y-4">

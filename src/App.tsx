@@ -147,7 +147,7 @@ export default function App() {
   }
 
   return (
-    <div className="app-container selection:bg-brand-primary/30">
+    <div className={`app-container selection:bg-brand-primary/30 ${isHost ? 'pt-16' : ''}`}>
       {!isConnected && (
         <div className="fixed inset-0 bg-brand-bg/80 backdrop-blur-sm z-[100] flex items-center justify-center">
           <div className="text-center space-y-4">

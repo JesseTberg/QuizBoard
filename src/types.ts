@@ -6,6 +6,7 @@ export interface Question {
   answer: string;
   points: number;
   isAnswered: boolean;
+  imageUrl?: string;
 }
 
 export interface Category {
@@ -25,6 +26,7 @@ export interface FinalQuestion {
   category: string;
   question: string;
   answer: string;
+  imageUrl?: string;
 }
 
 export interface Player {
