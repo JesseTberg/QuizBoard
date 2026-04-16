@@ -1,14 +1,16 @@
 import { useEffect, useState } from 'react';
 import socket from './lib/socket';
 import { GameState, GameBoard, FinalQuestion } from './types';
-import { DEFAULT_BOARDS } from './constants';
 import HostView from './components/HostView';
 import PlayerView from './components/PlayerView';
 import BoardView from './components/BoardView';
 import SetupView from './components/SetupView';
-import { Users, PlayCircle, Settings, X, Monitor } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Users, PlayCircle, Settings, X, Monitor, Loader2, Zap } from 'lucide-react';
 import { Footer } from './components/footer';
+import { Button } from './components/ui/Button';
+import { Card } from './components/ui/Card';
+import { cn } from './lib/utils';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState | null>(null);
@@ -27,19 +29,15 @@ export default function App() {
 
     const params = new URLSearchParams(window.location.search);
     const gameId = params.get('gameId');
-    const r = params.get('role') as any;
-
-    console.log('App mounted. GameId:', gameId, 'Role:', r);
+    const r = params.get('role') as 'host' | 'player' | 'board' | 'setup' | null;
 
     if (gameId) {
       const hostKey = `game_host_${gameId}`;
-      
-      // Allow transferring host status via URL parameter (used by Host QR code)
       const urlToken = params.get('hostToken');
+      
       if (urlToken) {
         localStorage.setItem(hostKey, 'true');
         localStorage.setItem(`game_token_${gameId}`, urlToken);
-        // Clean up URL
         params.delete('hostToken');
         window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
       } else if (params.get('isHost') === 'true') {
@@ -50,18 +48,14 @@ export default function App() {
       const token = localStorage.getItem(`game_token_${gameId}`);
       setHostToken(token);
       
-      let initialRole = r || 'player';
-      // Restrict access to host/setup if not the original host
+      let initialRole: 'host' | 'player' | 'board' | 'setup' = r || 'player';
       if ((initialRole === 'host' || initialRole === 'setup') && !wasHost) {
-        console.warn('Unauthorized access attempt to host/setup view. Redirecting to player.');
         initialRole = 'player';
         params.set('role', 'player');
         window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
       }
 
       if (wasHost) setIsHost(true);
-      
-      console.log('Emitting join-game for:', gameId, 'as', initialRole);
       socket.emit('join-game', { gameId, role: initialRole, hostToken: token });
       setRole(initialRole);
     } else {
@@ -69,17 +63,16 @@ export default function App() {
     }
 
     const handleGameState = (state: GameState) => {
-      console.log('Received game-state:', state.id);
       setGameState(state);
     };
 
     socket.on('game-state', handleGameState);
 
-    socket.on('game-created', ({ game, hostToken }: { game: GameState, hostToken: string }) => {
+    socket.on('game-created', ({ game, hostToken: token }: { game: GameState, hostToken: string }) => {
       setGameState(game);
-      setHostToken(hostToken);
+      setHostToken(token);
       localStorage.setItem(`game_host_${game.id}`, 'true');
-      localStorage.setItem(`game_token_${game.id}`, hostToken);
+      localStorage.setItem(`game_token_${game.id}`, token);
       setIsHost(true);
       const newUrl = `${window.location.origin}?gameId=${game.id}&role=host`;
       window.history.pushState({}, '', newUrl);
@@ -127,8 +120,9 @@ export default function App() {
   const copyJoinLink = () => {
     if (gameState) {
       const url = `${window.location.origin}?gameId=${gameState.id}&role=player`;
-      navigator.clipboard.writeText(url);
-      alert('Join link copied to clipboard!');
+      navigator.clipboard.writeText(url).then(() => {
+         // Simple feedback could be added here
+      });
     }
   };
 
@@ -138,90 +132,108 @@ export default function App() {
 
   if (error) {
     return (
-      <div className="error-screen">
-        <h1 className="error-title">Error</h1>
-        <p className="error-message">{error}</p>
-        <button onClick={resetToSetup} className="btn-primary">Go Home</button>
-      </div>
+      <main className="error-screen">
+        <article className="card-surface p-12 flex flex-col items-center gap-6 max-w-lg">
+          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center text-red-500">
+            <X size={32} />
+          </div>
+          <h1 className="text-4xl font-black italic tracking-tighter uppercase text-red-500">Security Alert</h1>
+          <p className="text-brand-muted text-lg">{error}</p>
+          <Button variant="primary" size="lg" onClick={resetToSetup} className="px-12">
+            RETURN TO SAFE ZONE
+          </Button>
+        </article>
+      </main>
     );
   }
 
   return (
-    <div className={`app-container selection:bg-brand-primary/30 ${isHost ? 'pt-16' : ''}`}>
+    <div className={cn("min-h-screen bg-brand-bg", isHost && 'pt-16')}>
       {!isConnected && (
-        <div className="fixed inset-0 bg-brand-bg/80 backdrop-blur-sm z-[100] flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 border-4 border-brand-primary border-t-transparent rounded-full animate-spin mx-auto" />
-            <p className="text-brand-muted font-bold tracking-widest uppercase">Connecting to Server...</p>
+        <aside className="fixed inset-0 bg-brand-bg/90 backdrop-blur-md z-[200] flex items-center justify-center">
+          <div className="text-center space-y-6">
+            <Loader2 className="w-16 h-16 text-brand-primary animate-spin mx-auto" strokeWidth={3} />
+            <h2 className="text-brand-muted font-black tracking-[0.3em] uppercase italic">Syncing with Trivia Matrix...</h2>
           </div>
-        </div>
-      )}
-
-      {error && (
-        <div className="floating-error">
-          <X size={20} /> {error}
-        </div>
+        </aside>
       )}
 
       {/* Persistent View Switcher Menu - Only for Host */}
       {isHost && (
-        <div className="view-switcher">
-            { [
-              { id: 'setup', label: 'SETUP', icon: Settings },
-              { id: 'host', label: 'HOST', icon: Monitor },
-              { id: 'player', label: 'PLAYER', icon: Users },
-              { id: 'board', label: 'BOARD', icon: Monitor }
+        <nav className="view-switcher flex items-center justify-center gap-2 p-3 bg-slate-950/60 backdrop-blur-2xl border-b border-white/5 fixed top-0 w-full z-[150]">
+            {[
+              { id: 'setup', label: 'DESIGN', icon: Settings },
+              { id: 'host', label: 'MASTER', icon: Zap },
+              { id: 'player', label: 'PLAY', icon: Users },
+              { id: 'board', label: 'DISPLAY', icon: Monitor }
             ].map((item) => (
-              <button
+              <Button
                 key={item.id}
+                variant={role === item.id ? 'primary' : 'ghost'}
+                size="sm"
                 onClick={() => handleRoleChange(item.id as any)}
-                className={`view-switcher-btn ${role === item.id ? 'view-switcher-btn-active' : ''}`}
+                className={cn(
+                  "px-6 py-2 rounded-xl text-[10px] tracking-[0.2em] font-black",
+                  role === item.id && "shadow-lg shadow-brand-primary/20"
+                )}
               >
-              <item.icon size={14} />
-              <span className="hidden sm:inline">{item.label}</span>
-            </button>
-          ))}
-        </div>
+                <item.icon size={12} className={cn(role === item.id ? 'text-white' : 'text-brand-muted')} />
+                <span className="hidden sm:inline ml-2">{item.label}</span>
+              </Button>
+            ))}
+        </nav>
       )}
 
       {role === 'setup' && <SetupView onStart={handleStartGame} />}
       
       {/* Global Test & Navigation Controls - Only for Host */}
       {gameState && isHost && (
-        <div className="test-controls">
+        <aside className="fixed bottom-6 right-6 z-[100] flex flex-col sm:flex-row gap-3">
           {role === 'host' && (
-            <button onClick={resetToSetup} className="btn-test btn-test-setup" title="Back to Setup">
-              <Settings size={20} /> <span className="hidden md:inline">Back to Setup</span>
-            </button>
+            <Button variant="ghost" className="card-surface bg-slate-900/80 backdrop-blur-md border border-white/10" onClick={resetToSetup}>
+              <Settings size={18} /> <span className="hidden md:inline">Configuration</span>
+            </Button>
           )}
-          <button onClick={openPlayerTab} className="btn-test btn-test-player" title="Open Player Tab">
-            <Users size={20} /> <span className="hidden md:inline">Open Player Tab</span>
-          </button>
-          <button onClick={copyJoinLink} className="btn-test btn-test-setup" title="Copy Join Link">
-            <PlayCircle size={20} /> <span className="hidden md:inline">Copy Link</span>
-          </button>
-        </div>
+          <Button variant="ghost" className="card-surface bg-slate-900/80 backdrop-blur-md border border-white/10" onClick={openPlayerTab}>
+            <Users size={18} /> <span className="hidden md:inline">Join as Player</span>
+          </Button>
+          <Button variant="primary" className="shadow-2xl" onClick={copyJoinLink}>
+            <PlayCircle size={18} /> <span className="hidden md:inline">Share Link</span>
+          </Button>
+        </aside>
       )}
 
-      {gameState && (
-        <div className="relative min-h-screen">
-          {role === 'host' && <HostView gameState={gameState} hostToken={hostToken} />}
-          {role === 'player' && <PlayerView gameState={gameState} />}
-          {role === 'board' && <BoardView gameState={gameState} />}
-        </div>
-      )}
+      <AnimatePresence mode="wait">
+        {gameState && (
+          <motion.div 
+            key={role} 
+            initial={{ opacity: 0, y: 10 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: -10 }}
+            className="relative"
+          >
+            {role === 'host' && <HostView gameState={gameState} hostToken={hostToken} />}
+            {role === 'player' && <PlayerView gameState={gameState} />}
+            {role === 'board' && <BoardView gameState={gameState} />}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {!gameState && role && role !== 'setup' && (
-        <div className="empty-state">
-          <div className="empty-state-icon">
-            <Monitor className="text-brand-muted" size={32} />
-          </div>
-          <div className="text-center-spacing">
-            <h2 className="empty-state-title">NO ACTIVE SESSION</h2>
-            <p className="empty-state-text">You need to start a game in the SETUP view before you can access the {role} view.</p>
-          </div>
-          <button onClick={() => setRole('setup')} className="btn-primary">GO TO SETUP</button>
-        </div>
+        <main className="empty-state min-h-screen flex items-center justify-center p-6 mt-16">
+          <Card className="max-w-md w-full p-12 text-center flex flex-col gap-8 shadow-2xl">
+            <div className="w-20 h-20 bg-brand-surface rounded-full flex items-center justify-center mx-auto border-2 border-white/5 shadow-inner">
+              <Monitor className="text-brand-muted" size={32} />
+            </div>
+            <div className="space-y-3">
+              <h2 className="text-3xl font-black italic tracking-tighter uppercase leading-none">NO ACTIVE SIGNAL</h2>
+              <p className="text-brand-muted text-sm leading-relaxed">The board is currently offline. You must finalize the configuration in SETUP to broadcast the session.</p>
+            </div>
+            <Button variant="primary" size="lg" onClick={() => setRole('setup')}>
+              REESTABLISH CONNECTION
+            </Button>
+          </Card>
+        </main>
       )}
       <Footer />
     </div>

@@ -1,8 +1,13 @@
 import { useState, ChangeEvent } from 'react';
-import { GameBoard, Category, Question, FinalQuestion } from '../types';
+import { GameBoard, Question, FinalQuestion } from '../types';
 import { DEFAULT_BOARDS, DEFAULT_FINAL_QUESTION } from '../constants';
-import { Plus, Trash2, Play, Monitor, Layers, Star, Upload, Download, FileUp, AlertCircle } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Plus, Trash2, Play, Monitor, Star, Upload, Download, FileUp, AlertCircle } from 'lucide-react';
+import { Button } from './ui/Button';
+import { Input } from './ui/Input';
+import { Textarea } from './ui/TextArea';
+import { Card } from './ui/Card';
+import { FormGroup } from './ui/FormGroup';
+import { cn } from '../lib/utils';
 
 interface SetupViewProps {
   onStart: (boards: GameBoard[], finalQuestion: FinalQuestion) => void;
@@ -20,7 +25,7 @@ export default function SetupView({ onStart }: SetupViewProps) {
     } : b));
   };
 
-  const updateQuestion = (boardIdx: number, catId: number, qId: number, field: keyof Question, value: any) => {
+  const updateQuestion = (boardIdx: number, catId: number, qId: number, field: keyof Question, value: unknown) => {
     setBoards(prev => prev.map((b, i) => i === boardIdx ? {
       ...b,
       categories: b.categories.map(c => c.id === catId ? {
@@ -76,18 +81,20 @@ export default function SetupView({ onStart }: SetupViewProps) {
         }))
       }))
     };
-    setBoards([...boards, newBoard]);
+    setBoards(prev => [...prev, newBoard]);
     setActiveBoardIndex(boards.length);
   };
 
   const removeBoard = (index: number) => {
     if (boards.length <= 1) return;
-    const newBoards = boards.filter((_, i) => i !== index).map((b, i) => ({
-      ...b,
-      name: `Board ${i + 1}`
-    }));
-    setBoards(newBoards);
-    setActiveBoardIndex(Math.max(0, activeBoardIndex - 1));
+    setBoards(prev => {
+      const newBoards = prev.filter((_, i) => i !== index).map((b, i) => ({
+        ...b,
+        name: `Board ${i + 1}`
+      }));
+      return newBoards;
+    });
+    setActiveBoardIndex(prev => Math.max(0, prev - 1));
   };
 
   const updateBoardName = (index: number, name: string) => {
@@ -234,76 +241,84 @@ export default function SetupView({ onStart }: SetupViewProps) {
   const boardsWithErrors = new Set(validationErrors.filter(e => e.boardIndex !== -1).map(e => e.boardIndex));
   const finalHasErrors = validationErrors.some(e => e.boardIndex === -1);
 
+  const currentBoard = boards[activeBoardIndex];
+
   return (
-    <div className="setup-container">
+    <main className="setup-container">
       <div className="max-width-container section-spacing">
-        <div className="text-center-spacing">
+        <header className="text-center-spacing">
           <Monitor className="w-16 h-16 text-brand-accent mx-auto" />
           <h1 className="game-title">GAME SETUP</h1>
           <p className="text-brand-muted">Customize your boards and questions before starting.</p>
-        </div>
+        </header>
 
-        <div className="flex flex-col items-center gap-6 mb-8">
-          <div className="flex flex-wrap gap-2 justify-center">
+        <section className="flex flex-col items-center gap-6 mb-8 pt-8">
+          <nav className="flex flex-wrap gap-2 justify-center">
             {boards.map((b, i) => (
               <div key={b.id} className="flex items-center gap-1 relative">
-                <button
+                <Button
+                  variant={activeBoardIndex === i ? 'accent' : 'ghost'}
                   onClick={() => setActiveBoardIndex(i)}
-                  className={`px-4 py-2 rounded font-black italic uppercase transition-all relative ${activeBoardIndex === i ? 'bg-brand-accent text-blue-900 scale-105' : 'bg-brand-surface text-brand-muted hover:bg-brand-primary/20'}`}
+                  className="px-6 py-2 rounded font-black italic uppercase transition-all relative"
                 >
                   {b.name}
                   {boardsWithErrors.has(i) && (
                     <span className="board-error-dot" />
                   )}
-                </button>
+                </Button>
                 {boards.length > 1 && (
-                  <button onClick={() => removeBoard(i)} className="p-2 text-red-500 hover:bg-red-500/10 rounded">
+                  <Button 
+                    variant="danger" 
+                    size="icon"
+                    onClick={() => removeBoard(i)} 
+                    className="p-2"
+                  >
                     <Trash2 size={16} />
-                  </button>
+                  </Button>
                 )}
               </div>
             ))}
-            <button onClick={addBoard} className="px-4 py-2 rounded bg-brand-primary/20 text-brand-primary font-black italic uppercase hover:bg-brand-primary/30 flex items-center gap-2">
+            <Button variant="ghost" onClick={addBoard} className="bg-brand-primary/10 hover:bg-brand-primary/20 text-brand-primary">
               <Plus size={16} /> Add Board
-            </button>
-          </div>
+            </Button>
+          </nav>
 
-          <div className="flex items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Board Name</label>
-              <input 
+          <Card className="flex items-center gap-6 p-6">
+            <FormGroup label="Board Name">
+              <Input 
                 type="text"
-                value={boards[activeBoardIndex].name}
+                value={currentBoard.name}
                 onChange={(e) => updateBoardName(activeBoardIndex, e.target.value)}
-                className="bg-transparent border-b border-white/20 focus:border-brand-accent outline-none text-xl font-black italic uppercase tracking-tighter text-brand-accent w-48"
+                className="bg-transparent border-b border-white/20 focus:border-brand-accent rounded-none px-0 text-xl font-black italic uppercase tracking-tighter text-brand-accent w-48"
               />
-            </div>
+            </FormGroup>
             
-            <div className="h-10 w-px bg-white/10 mx-2" />
+            <div className="h-10 w-px bg-white/10" />
 
-            <label className="flex items-center gap-3 cursor-pointer group">
-              <div className="flex flex-col gap-1">
-                <span className="text-[10px] font-black uppercase tracking-widest text-brand-muted group-hover:text-brand-primary transition-colors">Double Points</span>
-                <div 
-                  onClick={() => toggleDoublePoints(activeBoardIndex)}
-                  className={`w-12 h-6 rounded-full p-1 transition-colors ${boards[activeBoardIndex].isDoublePoints ? 'bg-brand-accent' : 'bg-white/10'}`}
-                >
-                  <div className={`w-4 h-4 bg-white rounded-full transition-transform ${boards[activeBoardIndex].isDoublePoints ? 'translate-x-6' : 'translate-x-0'}`} />
-                </div>
-              </div>
-            </label>
-          </div>
-        </div>
+            <div className="flex flex-col gap-1.5">
+              <span className="text-[10px] font-black uppercase tracking-widest text-brand-muted">Double Points</span>
+              <button 
+                onClick={() => toggleDoublePoints(activeBoardIndex)}
+                className={cn(
+                  "w-12 h-6 rounded-full p-1 transition-colors relative flex items-center",
+                  currentBoard.isDoublePoints ? 'bg-brand-accent' : 'bg-white/10'
+                )}
+              >
+                <div className={cn(
+                  "w-4 h-4 bg-white rounded-full transition-transform",
+                  currentBoard.isDoublePoints ? 'translate-x-[1.5rem]' : 'translate-x-0'
+                )} />
+              </button>
+            </div>
+          </Card>
+        </section>
 
-        <div className="flex justify-center gap-4 mb-8">
-          <button 
-            onClick={exportToJSON}
-            className="px-6 py-3 rounded-lg bg-white/5 text-brand-muted font-black italic uppercase hover:bg-white/10 flex items-center gap-2 transition-all border border-white/10 hover:border-white/20"
-          >
+        <section className="flex justify-center gap-4 mb-12">
+          <Button variant="ghost" onClick={exportToJSON} className="card-surface px-8">
             <Download size={18} /> Export JSON
-          </button>
+          </Button>
 
-          <label className="px-6 py-3 rounded-lg bg-white/5 text-brand-muted font-black italic uppercase hover:bg-white/10 flex items-center gap-2 cursor-pointer transition-all border border-white/10 hover:border-white/20">
+          <label className="btn-base btn-ghost btn-size-md card-surface px-8 cursor-pointer">
             <FileUp size={18} /> Import JSON
             <input 
               type="file" 
@@ -312,46 +327,55 @@ export default function SetupView({ onStart }: SetupViewProps) {
               className="hidden" 
             />
           </label>
-        </div>
+        </section>
 
-        <div className="grid-setup mb-12">
-          {boards[activeBoardIndex].categories.map(category => (
-            <div key={category.id} className="card-surface p-4 space-y-4">
-              <input 
+        <section className="grid-setup mb-16">
+          {currentBoard.categories.map(category => (
+            <Card key={category.id} className="p-4 flex flex-col gap-4">
+              <Input 
                 type="text"
                 value={category.title}
                 onChange={(e) => updateCategoryTitle(activeBoardIndex, category.id, e.target.value)}
-                className={`setup-category-input transition-all duration-300 ${!category.title.trim() ? 'validation-error-input' : ''}`}
+                error={!category.title.trim()}
+                className="setup-category-input"
                 placeholder="Category Name"
               />
-              <div className="space-y-3">
+              <div className="flex flex-col gap-3">
                 {category.questions.map(question => (
-                  <div key={question.id} className={`setup-question-box space-y-2 transition-all duration-300 ${(!question.text.trim() || !question.answer.trim()) ? 'validation-error-box' : ''}`}>
-                    <div className="flex justify-between items-center">
+                  <article 
+                    key={question.id} 
+                    className={cn(
+                      "setup-question-box",
+                      (!question.text.trim() || !question.answer.trim()) && "validation-error-box"
+                    )}
+                  >
+                    <div className="flex justify-between items-center mb-2">
                       <span className="text-brand-accent font-black text-sm">{question.points}</span>
                     </div>
-                    <textarea 
+                    <Textarea 
                       value={question.text}
                       onChange={(e) => updateQuestion(activeBoardIndex, category.id, question.id, 'text', e.target.value)}
-                      className={`setup-textarea transition-all duration-300 ${!question.text.trim() ? 'validation-error-input' : ''}`}
+                      error={!question.text.trim()}
+                      className="setup-textarea"
                       placeholder="Question"
                     />
-                    <input 
+                    <Input 
                       type="text"
                       value={question.answer}
                       onChange={(e) => updateQuestion(activeBoardIndex, category.id, question.id, 'answer', e.target.value)}
-                      className={`setup-input-small transition-all duration-300 ${!question.answer.trim() ? 'validation-error-input' : ''}`}
+                      error={!question.answer.trim()}
+                      className="setup-input-small mt-2"
                       placeholder="Answer"
                     />
-                    <div className="flex gap-2">
-                      <input 
+                    <div className="flex gap-2 mt-2">
+                      <Input 
                         type="text"
                         value={question.imageUrl || ''}
                         onChange={(e) => updateQuestion(activeBoardIndex, category.id, question.id, 'imageUrl', e.target.value)}
                         className="setup-input-small flex-1"
                         placeholder="Image URL"
                       />
-                      <label className="p-2 bg-brand-primary/10 text-brand-primary rounded cursor-pointer hover:bg-brand-primary/20 transition-colors">
+                      <label className="btn-base btn-ghost btn-size-icon bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition-colors cursor-pointer">
                         <Upload size={14} />
                         <input 
                           type="file" 
@@ -362,105 +386,113 @@ export default function SetupView({ onStart }: SetupViewProps) {
                       </label>
                     </div>
                     {question.imageUrl && (
-                      <div className="mt-2 relative group rounded overflow-hidden border border-white/10 aspect-video bg-black/20">
+                      <div className="mt-2 relative group rounded-lg overflow-hidden border border-white/10 aspect-video bg-black/20">
                         <img src={question.imageUrl} alt="Preview" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                        <button 
+                        <Button 
+                          variant="danger"
+                          size="icon"
                           onClick={() => updateQuestion(activeBoardIndex, category.id, question.id, 'imageUrl', '')}
-                          className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <Trash2 size={10} />
-                        </button>
+                        </Button>
                       </div>
                     )}
-                  </div>
+                  </article>
                 ))}
               </div>
-            </div>
+            </Card>
           ))}
-        </div>
+        </section>
 
-        <div className={`max-w-2xl mx-auto card-surface p-8 space-y-6 border-t-8 transition-all duration-300 ${finalHasErrors ? 'validation-error-section' : 'border-brand-accent'}`}>
-          <div className="flex items-center gap-3">
-            <Star className={finalHasErrors ? 'text-red-500 scale-125' : 'text-brand-accent'} fill="currentColor" />
-            <h2 className={`text-2xl font-black italic tracking-tighter uppercase ${finalHasErrors ? 'text-red-500' : ''}`}>Final Question</h2>
+        <section className={cn(
+          "max-w-2xl mx-auto card-surface p-10 space-y-8 border-t-8",
+          finalHasErrors ? "validation-error-section" : "border-brand-accent"
+        )}>
+          <div className="flex items-center gap-4">
+            <Star className={cn("w-8 h-8", finalHasErrors ? 'text-red-500 scale-110' : 'text-brand-accent')} fill="currentColor" />
+            <h2 className={cn("text-3xl font-black italic tracking-tighter uppercase", finalHasErrors ? 'text-red-500' : '')}>Final Question</h2>
           </div>
-          <div className="space-y-4">
-            <div>
-              <label className={`text-[10px] font-black uppercase tracking-widest mb-1 block ${finalHasErrors ? 'text-red-400' : 'text-brand-muted'}`}>Category</label>
-              <input 
+          <div className="flex flex-col gap-6">
+            <FormGroup label="Category">
+              <Input 
                 type="text"
                 value={finalQuestion.category}
-                onChange={(e) => setFinalQuestion({ ...finalQuestion, category: e.target.value })}
-                className={`setup-category-input transition-all duration-300 ${!finalQuestion.category.trim() ? 'validation-error-input' : ''}`}
+                onChange={(e) => setFinalQuestion(prev => ({ ...prev, category: e.target.value }))}
+                error={!finalQuestion.category.trim()}
+                className="setup-category-input"
               />
-            </div>
-            <div>
-              <label className={`text-[10px] font-black uppercase tracking-widest mb-1 block ${finalHasErrors ? 'text-red-400' : 'text-brand-muted'}`}>Question</label>
-              <textarea 
+            </FormGroup>
+            <FormGroup label="Question">
+              <Textarea 
                 value={finalQuestion.question}
-                onChange={(e) => setFinalQuestion({ ...finalQuestion, question: e.target.value })}
-                className={`setup-textarea transition-all duration-300 ${!finalQuestion.question.trim() ? 'validation-error-input' : ''}`}
+                onChange={(e) => setFinalQuestion(prev => ({ ...prev, question: e.target.value }))}
+                error={!finalQuestion.question.trim()}
+                className="setup-textarea h-32"
               />
-            </div>
-            <div>
-              <label className={`text-[10px] font-black uppercase tracking-widest mb-1 block ${finalHasErrors ? 'text-red-400' : 'text-brand-muted'}`}>Answer</label>
-              <input 
+            </FormGroup>
+            <FormGroup label="Answer">
+              <Input 
                 type="text"
                 value={finalQuestion.answer}
-                onChange={(e) => setFinalQuestion({ ...finalQuestion, answer: e.target.value })}
-                className={`setup-input-small transition-all duration-300 ${!finalQuestion.answer.trim() ? 'validation-error-input' : ''}`}
+                onChange={(e) => setFinalQuestion(prev => ({ ...prev, answer: e.target.value }))}
+                error={!finalQuestion.answer.trim()}
+                className="setup-input-small"
               />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest text-brand-muted mb-1 block">Image (URL or Upload)</label>
+            </FormGroup>
+            <FormGroup label="Image (URL or Upload)">
               <div className="flex gap-2">
-                <input 
+                <Input 
                   type="text"
                   value={finalQuestion.imageUrl || ''}
-                  onChange={(e) => setFinalQuestion({ ...finalQuestion, imageUrl: e.target.value })}
+                  onChange={(e) => setFinalQuestion(prev => ({ ...prev, imageUrl: e.target.value }))}
                   className="setup-input-small flex-1"
                   placeholder="https://..."
                 />
-                <label className="p-2 bg-brand-primary/10 text-brand-primary rounded cursor-pointer hover:bg-brand-primary/20 transition-colors">
+                <label className="btn-base btn-ghost btn-size-icon bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 transition-colors cursor-pointer">
                   <Upload size={14} />
                   <input 
                     type="file" 
                     className="hidden" 
                     accept="image/*"
-                    onChange={(e) => handleImageUpload(e, (url) => setFinalQuestion({ ...finalQuestion, imageUrl: url }))}
+                    onChange={(e) => handleImageUpload(e, (url) => setFinalQuestion(prev => ({ ...prev, imageUrl: url })))}
                   />
                 </label>
               </div>
               {finalQuestion.imageUrl && (
-                <div className="mt-4 relative group rounded-xl overflow-hidden border border-white/10 aspect-video bg-black/20">
+                <div className="mt-4 relative group rounded-2xl overflow-hidden border border-white/10 aspect-video bg-black/20">
                   <img src={finalQuestion.imageUrl} alt="Final Preview" className="w-full h-full object-contain" referrerPolicy="no-referrer" />
-                  <button 
-                    onClick={() => setFinalQuestion({ ...finalQuestion, imageUrl: '' })}
-                    className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                  <Button 
+                    variant="danger"
+                    size="icon"
+                    onClick={() => setFinalQuestion(prev => ({ ...prev, imageUrl: '' }))}
+                    className="absolute top-2 right-2 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </Button>
                 </div>
               )}
-            </div>
+            </FormGroup>
           </div>
-        </div>
+        </section>
 
-        <div className="setup-actions mt-8 pb-8 flex flex-col items-center gap-4">
+        <footer className="setup-actions mt-16 pb-16 flex flex-col items-center gap-6">
           {validationErrors.length > 0 && (
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-3">
               <div className="validation-error-badge">
                 <AlertCircle size={20} />
                 <span className="text-sm font-black uppercase tracking-widest">
                   {validationErrors.length} Fields need attention
                 </span>
               </div>
-              <p className="text-[10px] text-red-500/80 font-bold uppercase tracking-widest">
+              <p className="text-xs text-red-500/80 font-bold uppercase tracking-widest">
                 Issues in: {Array.from(new Set(validationErrors.map(e => e.boardIndex === -1 ? 'Final Question' : boards[e.boardIndex].name))).join(', ')}
               </p>
             </div>
           )}
-          <button 
+          <Button 
+            variant="accent"
+            size="lg"
             onClick={() => {
               if (validationErrors.length > 0) {
                 alert("Please fill in all red-highlighted fields before starting.");
@@ -468,12 +500,15 @@ export default function SetupView({ onStart }: SetupViewProps) {
               }
               onStart(boards, finalQuestion);
             }}
-            className={`btn-accent px-16 py-6 text-2xl italic tracking-tighter ${validationErrors.length > 0 ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
+            className={cn(
+              "px-16 py-8 text-3xl italic tracking-tighter btn-accent",
+              validationErrors.length > 0 && "opacity-50 grayscale cursor-not-allowed"
+            )}
           >
-            <Play fill="currentColor" /> START GAME SESSION
-          </button>
-        </div>
+            <Play fill="currentColor" size={28} /> START GAME SESSION
+          </Button>
+        </footer>
       </div>
-    </div>
+    </main>
   );
 }
