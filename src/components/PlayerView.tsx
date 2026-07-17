@@ -90,7 +90,7 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
                 disabled={isJoining}
                 className="w-full py-8 text-2xl italic tracking-tighter"
               >
-                {isJoining ? 'JOINING...' : 'JOIN ARENA'}
+                {isJoining ? 'JOINING...' : 'JOIN GAME'}
               </Button>
             </form>
           </Card>
@@ -103,11 +103,23 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
   const someoneElseBuzzed = gameState.buzzedPlayerId && gameState.buzzedPlayerId !== socket.id;
   const buzzerActive = gameState.status === 'question' && !gameState.buzzedPlayerId;
 
+  // Resolve current active question information to present to contestant
+  const currentBoard = gameState.boards[gameState.currentBoardIndex];
+  const currentQuestionData = gameState.currentQuestion && currentBoard
+    ? currentBoard.categories.find(c => c.id === gameState.currentQuestion?.categoryId)
+        ?.questions.find(q => q.id === gameState.currentQuestion?.questionId)
+    : null;
+
+  const currentQuestionCategory = currentBoard?.categories.find(c => 
+    c.questions.some(q => q.id === gameState.currentQuestion?.questionId)
+  );
+  const currentQuestionCategoryTitle = currentQuestionCategory?.title || '';
+
   return (
     <main className="player-container flex flex-col min-h-screen">
       {/* Header */}
       <header className="player-header p-4 bg-brand-surface border-b border-white/5 sticky top-0 z-10 backdrop-blur-md bg-opacity-80">
-        <div className="max-width-container flex justify-between items-center px-4">
+        <div className="max-width-container flex justify-between items-center px-4 w-full">
           <section className="flex items-center gap-3">
             <div className="player-avatar w-12 h-12">
               {currentPlayer.name[0].toUpperCase()}
@@ -130,7 +142,7 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
       </header>
 
       {/* Main Action Area */}
-      <section className="player-main flex-1 flex flex-col items-center justify-center p-6 gap-12 max-width-container">
+      <section className="player-main flex-1 flex flex-col items-center justify-center p-6 gap-6 max-width-container">
         <AnimatePresence mode="wait">
           {gameState.status === 'lobby' && (
             <motion.div 
@@ -166,27 +178,86 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
 
           {(gameState.status === 'question' || gameState.status === 'buzzed') && (
             <motion.div 
-              key="buzzer-area"
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 2 }}
-              className="w-full max-w-[280px] md:max-w-[500px] aspect-square"
+              key="buzzer-screen"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full max-w-md flex flex-col gap-6 items-center"
             >
-              <button 
-                onClick={buzzIn}
-                disabled={!buzzerActive}
-                className={cn(
-                  "buzzer-button h-full w-full shadow-2xl",
-                  isBuzzed ? 'buzzer-success' : 
-                    someoneElseBuzzed ? 'buzzer-locked' :
-                    buzzerActive ? 'buzzer-active' :
-                    'buzzer-locked opacity-30 h-full w-full'
+              {currentQuestionData && (
+                <Card className="w-full p-5 shadow-xl border border-white/10 bg-slate-900/60 backdrop-blur-md flex flex-col gap-3 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-brand-primary/10 rounded-full blur-3xl pointer-events-none" />
+                  
+                  <div className="flex justify-between items-center text-[10px] font-black uppercase tracking-wider border-b border-white/5 pb-2">
+                    <span className="text-brand-accent px-2 py-0.5 rounded bg-brand-accent/10">
+                      {currentQuestionCategoryTitle || 'General'}
+                    </span>
+                    <span className="text-brand-primary bg-brand-primary/10 px-2 py-0.5 rounded">
+                      {currentQuestionData.points} PTS
+                    </span>
+                  </div>
+
+                  <p className="text-base font-black tracking-tight leading-snug uppercase italic text-center text-white/95">
+                    {currentQuestionData.text}
+                  </p>
+
+                  {currentQuestionData.imageUrl && (
+                    <div className="rounded-lg overflow-hidden border border-white/10 aspect-video bg-black/40 mt-1 max-h-[140px]">
+                      <img 
+                        src={currentQuestionData.imageUrl} 
+                        alt="Question Content View" 
+                        className="w-full h-full object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {/* Status Banner */}
+              <div className="text-center h-6 flex items-center justify-center">
+                {isBuzzed ? (
+                  <p className="text-sm font-black tracking-[0.2em] text-green-400 uppercase animate-pulse">
+                    🎤 YOUR TURN!
+                  </p>
+                ) : someoneElseBuzzed ? (
+                  <p className="text-sm font-black tracking-[0.15em] text-red-400 uppercase">
+                    🔒 {gameState.players.find(p => p.id === gameState.buzzedPlayerId)?.name.toUpperCase() || 'SOMEONE'} BUZZED
+                  </p>
+                ) : buzzerActive ? (
+                  <p className="text-sm font-black tracking-[0.2em] text-brand-accent uppercase animate-bounce">
+                    ⚡ BUZZ IN NOW!
+                  </p>
+                ) : (
+                  <p className="text-sm font-black tracking-[0.2em] text-brand-muted uppercase">
+                    ⏳ WAIT FOR IT...
+                  </p>
                 )}
-              >
-                <Zap size={100} fill={isBuzzed ? 'white' : 'currentColor'} className={cn(buzzerActive && 'animate-pulse')} />
-                <span className="text-5xl font-extrabold italic tracking-tighter uppercase mt-4">
-                  {isBuzzed ? 'YOU!' : someoneElseBuzzed ? 'LOCKED' : buzzerActive ? 'BUZZ!' : 'WAIT'}
-                </span>
-              </button>
+              </div>
+
+              {/* Tactile Buzzer Button */}
+              <div className="w-[240px] h-[240px] relative">
+                <button 
+                  onClick={buzzIn}
+                  disabled={!buzzerActive}
+                  className={cn(
+                    "buzzer-button h-full w-full",
+                    isBuzzed ? 'buzzer-success' : 
+                      someoneElseBuzzed ? 'buzzer-locked' :
+                      buzzerActive ? 'buzzer-active' :
+                      'buzzer-locked opacity-40'
+                  )}
+                >
+                  {buzzerActive && (
+                    <span className="absolute inset-0 rounded-full bg-red-500/20 animate-ping pointer-events-none" />
+                  )}
+                  
+                  <Zap size={56} fill={isBuzzed ? 'white' : 'currentColor'} className={cn(buzzerActive && 'animate-pulse')} />
+                  <span className="text-xl font-black italic tracking-tighter uppercase leading-none mt-2">
+                    {isBuzzed ? 'YOURS' : someoneElseBuzzed ? 'LOCKED' : buzzerActive ? 'BUZZ' : 'WAIT'}
+                  </span>
+                </button>
+              </div>
             </motion.div>
           )}
 
@@ -294,29 +365,60 @@ export default function PlayerView({ gameState }: PlayerViewProps) {
             <span className="text-[10px] font-black text-brand-muted uppercase tracking-[0.3em] leading-none">Standings</span>
           </header>
           <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar-hidden">
-            {gameState.players.sort((a,b) => b.score - a.score).map((player, idx) => (
-              <Card 
-                key={player.id} 
-                className={cn(
-                  "shrink-0 min-w-[140px] p-4 flex flex-col gap-2 transition-all",
-                  player.id === socket.id ? 'bg-brand-primary/20 border-brand-primary border-2 -translate-y-1' : 'bg-slate-800/40 border-slate-700/50 grayscale-[0.5]'
-                )}
-              >
-                <header className="flex items-center justify-between">
-                  <span className="text-[10px] font-bold text-brand-muted">#{idx + 1}</span>
-                  {player.id === socket.id && <Zap size={10} className="text-brand-primary fill-brand-primary animate-pulse" />}
-                </header>
-                <div className="flex flex-col gap-1">
-                  <span className="font-black italic uppercase tracking-tighter text-sm truncate">{player.name}</span>
-                  <span className={cn(
-                    "font-mono font-black text-lg leading-none",
-                    player.score >= 0 ? 'text-brand-accent' : 'text-red-500'
-                  )}>
-                    {player.score}
-                  </span>
-                </div>
-              </Card>
-            ))}
+            {gameState.players.sort((a,b) => b.score - a.score).map((player, idx) => {
+              const isSelf = player.id === socket.id;
+              const rank = idx + 1;
+              
+              // Custom rank color background matching first, second, third places
+              const rankColorClasses = 
+                rank === 1 ? 'bg-gradient-to-r from-yellow-500 to-amber-500 text-slate-950 font-black' :
+                rank === 2 ? 'bg-gradient-to-r from-slate-350 to-slate-450 text-slate-950 font-black bg-slate-300' :
+                rank === 3 ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white font-black' :
+                'bg-slate-800 text-brand-muted';
+
+              return (
+                <Card 
+                  key={player.id} 
+                  className={cn(
+                    "shrink-0 min-w-[150px] p-4 flex flex-col gap-3 transition-all relative overflow-hidden",
+                    isSelf 
+                      ? 'border-brand-primary border-2 bg-brand-primary/15 shadow-[0_0_20px_rgba(37,99,235,0.15)]' 
+                      : 'border-white/5 bg-slate-900/40 opacity-90'
+                  )}
+                >
+                  {isSelf && (
+                    <div className="absolute top-0 right-0 w-1.5 h-full bg-brand-primary" />
+                  )}
+                  <header className="flex items-center justify-between">
+                    <span className={cn(
+                      "text-[10px] px-2 py-0.5 rounded font-black tracking-widest",
+                      rankColorClasses
+                    )}>
+                      #{rank}
+                    </span>
+                    {isSelf && (
+                      <span className="text-[9px] text-brand-primary uppercase font-black tracking-widest flex items-center gap-1">
+                        YOU <Zap size={10} className="fill-brand-primary text-brand-primary animate-pulse" />
+                      </span>
+                    )}
+                  </header>
+                  <div className="flex flex-col">
+                    <span className={cn(
+                      "font-bold italic uppercase tracking-tight text-sm truncate",
+                      isSelf ? 'text-white' : 'text-slate-300'
+                    )}>
+                      {player.name}
+                    </span>
+                    <span className={cn(
+                      "font-mono font-black text-xl leading-none mt-1",
+                      player.score >= 0 ? 'text-brand-accent' : 'text-red-500'
+                    )}>
+                      {player.score}
+                    </span>
+                  </div>
+                </Card>
+              );
+            })}
           </div>
         </div>
       </footer>

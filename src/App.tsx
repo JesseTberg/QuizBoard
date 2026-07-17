@@ -235,7 +235,7 @@ export default function App() {
           </Card>
         </main>
       )}
-      <Footer />
+      {role !== 'board' && <Footer />}
     </div>
   );
 }

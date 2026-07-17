@@ -112,7 +112,7 @@ body {
 }
 
 .category-card {
-  @apply bg-brand-primary h-28 flex items-center justify-center text-center p-4 rounded-2xl border-2 border-white/10 shadow-2xl;
+  @apply bg-brand-primary h-14 md:h-16 lg:h-20 flex items-center justify-center text-center p-2.5 md:p-3 shadow-2xl;
 }
 
 .question-card {
@@ -128,19 +128,19 @@ body {
 }
 
 .buzzer-button {
-  @apply w-full aspect-square rounded-full border-[16px] transition-all duration-75 flex flex-col items-center justify-center gap-4;
+  @apply relative rounded-full flex flex-col items-center justify-center gap-2 select-none transition-all duration-100 ease-out border-[12px] md:border-[16px];
 }
 
 .buzzer-active {
-  @apply bg-red-600 border-red-500 shadow-[0_24px_0_rgb(153,27,27)] active:translate-y-3 active:shadow-[0_12px_0_rgb(153,27,27)];
+  @apply bg-gradient-to-b from-red-500 to-red-800 border-red-950 shadow-[0_16px_0_#7f1d1d,0_30px_50px_rgba(239,68,68,0.35)] hover:from-red-400 hover:to-red-700 active:translate-y-2.5 active:shadow-[0_4px_0_#7f1d1d,0_10px_20px_rgba(239,68,68,0.2)] text-white cursor-pointer;
 }
 
 .buzzer-success {
-  @apply bg-green-500 border-green-400 shadow-[0_0_80px_rgba(34,197,94,0.4)];
+  @apply bg-gradient-to-b from-green-400 to-green-600 border-green-950 shadow-[0_8px_0_#14532d,0_0_80px_rgba(34,197,94,0.6)] text-white scale-105;
 }
 
 .buzzer-locked {
-  @apply bg-slate-800 border-slate-700 opacity-50 grayscale;
+  @apply bg-gradient-to-b from-slate-700 to-slate-800 border-slate-900 shadow-[0_4px_0_#1e293b,0_5px_15px_rgba(0,0,0,0.3)] text-slate-500 cursor-not-allowed opacity-60;
 }
 
 /* Views Layouts */
@@ -189,7 +189,7 @@ body {
 }
 
 .board-header {
-  @apply bg-brand-surface p-6 text-center border-b-4 border-brand-accent shadow-2xl relative z-10;
+  @apply bg-brand-surface text-center shadow-2xl relative z-10;
 }
 
 .board-player-card {
@@ -289,7 +289,7 @@ body {
 }
 
 .board-footer {
-  @apply bg-brand-surface p-4 md:p-8 flex justify-center gap-4 md:gap-10 border-t-4 border-brand-accent shadow-[0_-20px_50px_rgba(0,0,0,0.5)] overflow-x-auto;
+  @apply bg-brand-surface flex justify-center overflow-x-auto;
 }
 
 .host-grid {
